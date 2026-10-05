@@ -36,3 +36,27 @@ No Render, configure as variáveis de ambiente:
 ## Licenças
 
 No modo `lemonsqueezy`, o servidor usa a License API do Lemon Squeezy para ativar/validar a chave. Configure o produto com limite de 1 ativação para reduzir compartilhamento.
+
+
+## Ações de presentes
+
+O endpoint `POST /api/gift` envia uma ação para o avatar do nick informado.
+Requer o mesmo Bearer token usado pelo chat.
+
+Ações prontas:
+- `gigante` — deixa o avatar 1,75x maior temporariamente.
+- `aura1000` — soma +1000 de aura e mostra zoom.
+- `dourado` — aplica destaque dourado.
+- `numero67` — mostra um “67” grande e colorido acima do avatar.
+- `fogo` — adiciona fogo e iluminação ao avatar.
+
+Exemplo:
+```json
+{
+  "nick": "Knzz0102",
+  "action": "fogo",
+  "duration": 10
+}
+```
+
+O próximo passo do app do cliente é mapear cada presente do TikFinity para uma dessas ações.
