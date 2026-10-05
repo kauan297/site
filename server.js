@@ -84,6 +84,32 @@ function topicForSession(sessionId) {
   return `LunaDance_${sessionId}`;
 }
 
+function stableRoomId(seed) {
+  if (!SESSION_SECRET) {
+    throw new Error("SESSION_SECRET não configurado");
+  }
+  return crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(String(seed || "lunadance"))
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function createSessionToken(sid, auth) {
+  const exp = nowSeconds() + SESSION_HOURS * 3600;
+  const token = signPayload({
+    sid,
+    exp,
+    licenseMode: auth && auth.mode ? auth.mode : LICENSE_MODE,
+    licenseInstanceId: auth && auth.instanceId ? auth.instanceId : null
+  });
+  return {
+    token,
+    exp,
+    expiresAt: new Date(exp * 1000).toISOString()
+  };
+}
+
 function rateAllowed(key) {
   const now = Date.now();
   const existing = rateBuckets.get(key);
@@ -234,14 +260,7 @@ app.post("/api/session/create", async (req, res) => {
     }
 
     const sid = crypto.randomBytes(24).toString("base64url");
-    const exp = nowSeconds() + SESSION_HOURS * 3600;
-
-    const token = signPayload({
-      sid,
-      exp,
-      licenseMode: auth.mode,
-      licenseInstanceId: auth.instanceId || null
-    });
+    const session = createSessionToken(sid, auth);
 
     const webLaunchUrl =
       `https://www.roblox.com/games/start?placeId=${encodeURIComponent(ROBLOX_PLACE_ID)}&launchData=${encodeURIComponent(sid)}`;
@@ -251,8 +270,8 @@ app.post("/api/session/create", async (req, res) => {
     return res.json({
       ok: true,
       sessionId: sid,
-      sessionToken: token,
-      expiresAt: new Date(exp * 1000).toISOString(),
+      sessionToken: session.token,
+      expiresAt: session.expiresAt,
       licenseInstanceId: auth.instanceId || null,
       launchUrl: webLaunchUrl,
       appLaunchUrl
@@ -264,6 +283,86 @@ app.post("/api/session/create", async (req, res) => {
       error: error.status ? error.message : "Falha ao criar a sessão."
     });
   }
+});
+
+app.post("/api/activate", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const licenseKey = body.license_key || body.licenseKey || "";
+    const machineCode = String(body.machine_code || body.machineCode || "pc").slice(0, 128);
+
+    const auth = await authorizeLicense({
+      licenseKey,
+      instanceId: null,
+      deviceName: `Luna Dance ${machineCode.slice(0, 20)}`
+    });
+
+    if (!auth.ok) {
+      return res.status(403).json({ ok: false, error: auth.error || "Licença recusada." });
+    }
+
+    const sid = stableRoomId(`${auth.instanceId || licenseKey || "development"}:${machineCode}`);
+    const session = createSessionToken(sid, auth);
+
+    return res.json({
+      ok: true,
+      instance_id: auth.instanceId || "development",
+      room_id: sid,
+      place_id: ROBLOX_PLACE_ID,
+      session_token: session.token,
+      expires_at: session.expiresAt
+    });
+  } catch (error) {
+    console.error("[ACTIVATE]", error.message);
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: error.status ? error.message : "Falha ao ativar."
+    });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const licenseKey = body.license_key || body.licenseKey || "";
+    const instanceId = body.instance_id || body.instanceId || null;
+    const machineCode = String(body.machine_code || body.machineCode || "pc").slice(0, 128);
+
+    const auth = await authorizeLicense({
+      licenseKey,
+      instanceId,
+      deviceName: `Luna Dance ${machineCode.slice(0, 20)}`
+    });
+
+    if (!auth.ok) {
+      return res.status(403).json({ ok: false, error: auth.error || "Licença recusada." });
+    }
+
+    const sid = stableRoomId(`${auth.instanceId || licenseKey || "development"}:${machineCode}`);
+    const session = createSessionToken(sid, auth);
+
+    return res.json({
+      ok: true,
+      instance_id: auth.instanceId || instanceId || "development",
+      room_id: sid,
+      place_id: ROBLOX_PLACE_ID,
+      session_token: session.token,
+      expires_at: session.expiresAt
+    });
+  } catch (error) {
+    console.error("[LOGIN]", error.message);
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: error.status ? error.message : "Falha ao validar a licença."
+    });
+  }
+});
+
+app.post("/api/comment", async (req, res) => {
+  req.url = "/api/chat";
+  return app._router.handle(req, res, () => {
+    res.status(404).json({ ok: false, error: "Rota de chat indisponível." });
+  });
 });
 
 app.post("/api/chat", async (req, res) => {
@@ -299,6 +398,11 @@ app.post("/api/chat", async (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Rota não encontrada." });
 });
+
+if (!SESSION_SECRET) {
+  console.error("ERRO: SESSION_SECRET não configurado.");
+  process.exit(1);
+}
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Luna Dance Server online na porta ${PORT}`);
