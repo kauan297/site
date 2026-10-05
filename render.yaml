@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: lunadance-server
+    runtime: node
+    branch: lunadance-server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: ROBLOX_UNIVERSE_ID
+        value: "10769353715"
+      - key: ROBLOX_PLACE_ID
+        value: "76605256587436"
+      - key: SESSION_HOURS
+        value: "12"
+      - key: LICENSE_MODE
+        value: "off"
+      - key: ROBLOX_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
