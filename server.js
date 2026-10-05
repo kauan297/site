@@ -236,7 +236,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "Luna Dance Server",
     ok: true,
-    version: 4,
+    version: 5,
     licenseMode: LICENSE_MODE,
     placeId: ROBLOX_PLACE_ID
   });
@@ -400,7 +400,7 @@ app.post("/api/chat", handleChat);
 const GIFT_ACTIONS = new Set([
   "gigante",
   "gigante_dourado",
-  "67medio",
+  "reset",
   "mega_fogo"
 ]);
 
@@ -419,19 +419,19 @@ app.post("/api/gift", async (req, res) => {
     if (typeof nick === "string") nick = nick.trim().replace(/^@/, "");
     if (typeof action === "string") action = action.trim().toLowerCase();
 
-    if (!validNick(nick)) {
-      return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
-    }
     if (!GIFT_ACTIONS.has(action)) {
       return res.status(400).json({ ok: false, error: "Ação de presente inválida." });
     }
+    if (action !== "reset" && !validNick(nick)) {
+      return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
+    }
 
-    if (!Number.isFinite(duration)) duration = 10;
-    duration = Math.max(2, Math.min(duration, 30));
+    if (!Number.isFinite(duration)) duration = 0;
+    duration = Math.max(0, Math.min(duration, 30));
 
     await publishRoblox(topicForSession(session.sid), {
       type: "gift_action",
-      nick,
+      nick: action === "reset" ? "" : nick,
       action,
       duration
     });
