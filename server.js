@@ -236,7 +236,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "Luna Dance Server",
     ok: true,
-    version: 3,
+    version: 4,
     licenseMode: LICENSE_MODE,
     placeId: ROBLOX_PLACE_ID
   });
@@ -399,10 +399,9 @@ app.post("/api/chat", handleChat);
 
 const GIFT_ACTIONS = new Set([
   "gigante",
-  "aura1000",
-  "dourado",
-  "numero67",
-  "fogo"
+  "gigante_dourado",
+  "67medio",
+  "mega_fogo"
 ]);
 
 app.post("/api/gift", async (req, res) => {
