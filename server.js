@@ -209,6 +209,9 @@ async function publishRoblox(topic, message) {
     throw new Error("ROBLOX_API_KEY não configurada");
   }
 
+  const payloadMessage =
+    typeof message === "string" ? message : JSON.stringify(message);
+
   const response = await fetch(
     `https://apis.roblox.com/cloud/v2/universes/${encodeURIComponent(ROBLOX_UNIVERSE_ID)}:publishMessage`,
     {
@@ -217,7 +220,7 @@ async function publishRoblox(topic, message) {
         "x-api-key": ROBLOX_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ topic, message })
+      body: JSON.stringify({ topic, message: payloadMessage })
     }
   );
 
@@ -233,7 +236,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "Luna Dance Server",
     ok: true,
-    version: 2,
+    version: 3,
     licenseMode: LICENSE_MODE,
     placeId: ROBLOX_PLACE_ID
   });
@@ -377,7 +380,10 @@ async function handleChat(req, res) {
       return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
     }
 
-    await publishRoblox(topicForSession(session.sid), nick);
+    await publishRoblox(topicForSession(session.sid), {
+      type: "chat",
+      nick
+    });
     return res.json({ ok: true });
   } catch (error) {
     console.error("[CHAT]", error.message);
@@ -390,6 +396,56 @@ async function handleChat(req, res) {
 
 app.post("/api/comment", handleChat);
 app.post("/api/chat", handleChat);
+
+const GIFT_ACTIONS = new Set([
+  "gigante",
+  "aura1000",
+  "dourado",
+  "numero67",
+  "fogo"
+]);
+
+app.post("/api/gift", async (req, res) => {
+  try {
+    const token = getBearer(req);
+    const session = verifyToken(token);
+    if (!session) {
+      return res.status(401).json({ ok: false, error: "Sessão inválida ou expirada." });
+    }
+
+    let nick = req.body && req.body.nick;
+    let action = req.body && req.body.action;
+    let duration = Number(req.body && req.body.duration);
+
+    if (typeof nick === "string") nick = nick.trim().replace(/^@/, "");
+    if (typeof action === "string") action = action.trim().toLowerCase();
+
+    if (!validNick(nick)) {
+      return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
+    }
+    if (!GIFT_ACTIONS.has(action)) {
+      return res.status(400).json({ ok: false, error: "Ação de presente inválida." });
+    }
+
+    if (!Number.isFinite(duration)) duration = 10;
+    duration = Math.max(2, Math.min(duration, 30));
+
+    await publishRoblox(topicForSession(session.sid), {
+      type: "gift_action",
+      nick,
+      action,
+      duration
+    });
+
+    return res.json({ ok: true, action, nick });
+  } catch (error) {
+    console.error("[GIFT]", error.message);
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: "Falha ao enviar a ação de presente ao Roblox."
+    });
+  }
+});
 
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Rota não encontrada." });
