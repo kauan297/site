@@ -40,23 +40,22 @@ No modo `lemonsqueezy`, o servidor usa a License API do Lemon Squeezy para ativa
 
 ## Ações de presentes
 
-O endpoint `POST /api/gift` envia uma ação para o avatar do nick informado.
+O endpoint `POST /api/gift` envia uma ação permanente para o avatar do nick informado.
 Requer o mesmo Bearer token usado pelo chat.
 
-Ações prontas:
-- `gigante` — deixa o avatar 1,75x maior temporariamente.
-- `aura1000` — soma +1000 de aura e mostra zoom.
-- `dourado` — aplica destaque dourado.
-- `numero67` — mostra um “67” grande e colorido acima do avatar.
-- `fogo` — adiciona fogo e iluminação ao avatar.
+Ações atuais:
+- `gigante` — deixa o avatar grande e mantém a transformação.
+- `gigante_dourado` — deixa o avatar maior, com dourado leve, mantendo posição e nick.
+- `67medio` — deixa o avatar meio grande e ativa a dança 6-7.
+- `mega_fogo` — deixa o avatar maior que os outros e em chamas, sem dourado.
 
 Exemplo:
 ```json
 {
   "nick": "Knzz0102",
-  "action": "fogo",
-  "duration": 10
+  "action": "mega_fogo",
+  "duration": 0
 }
 ```
 
-O próximo passo do app do cliente é mapear cada presente do TikFinity para uma dessas ações.
+O app do cliente mapeia cada presente do TikFinity para uma dessas quatro ações.
