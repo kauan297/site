@@ -233,7 +233,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "Luna Dance Server",
     ok: true,
-    version: 1,
+    version: 2,
     licenseMode: LICENSE_MODE,
     placeId: ROBLOX_PLACE_ID
   });
@@ -358,14 +358,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-app.post("/api/comment", async (req, res) => {
-  req.url = "/api/chat";
-  return app._router.handle(req, res, () => {
-    res.status(404).json({ ok: false, error: "Rota de chat indisponível." });
-  });
-});
-
-app.post("/api/chat", async (req, res) => {
+async function handleChat(req, res) {
   try {
     const token = getBearer(req);
     const session = verifyToken(token);
@@ -393,7 +386,10 @@ app.post("/api/chat", async (req, res) => {
       error: "Falha ao enviar o nick ao Roblox."
     });
   }
-});
+}
+
+app.post("/api/comment", handleChat);
+app.post("/api/chat", handleChat);
 
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Rota não encontrada." });
