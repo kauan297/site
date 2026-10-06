@@ -15,7 +15,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "8");
+  res.setHeader("X-PalcoLive-Version", "9");
   next();
 });
 
@@ -28,7 +28,7 @@ const LICENSE_MODE = (process.env.LICENSE_MODE || "test").toLowerCase();
 const TEST_LICENSE_KEY = String(process.env.TEST_LICENSE_KEY || "").trim();
 const LEMON_PRODUCT_ID = String(process.env.LEMON_PRODUCT_ID || "").trim();
 const SESSION_HOURS = Math.max(1, Math.min(6, Number(process.env.SESSION_HOURS || 6)));
-const TIKTOOL_API_KEY = String(process.env.TIKTOOL_API_KEY || "").trim();
+const EULER_API_KEY = String(process.env.EULER_API_KEY || "").trim();
 
 const buckets = new Map();
 
@@ -283,15 +283,15 @@ async function publishRoblox(topic, message) {
 }
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 8 });
+  res.json({ name: "PalcoLive Server", ok: true, version: 9 });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 8 });
+  res.json({ ok: true, version: 9 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 8 });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 9 });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -405,7 +405,7 @@ const tiktokDirect = createTikTokDirect({
   publishRoblox,
   topicForSession,
   validNick,
-  apiKey: TIKTOOL_API_KEY
+  apiKey: EULER_API_KEY
 });
 
 function validTikTokUsername(value) {
@@ -474,10 +474,10 @@ app.post("/api/tiktok/start", async (req, res) => {
     let username = String(req.body?.username || "").trim().replace(/^@/, "");
     const gifts = readGiftConfig(req.body);
 
-    if (!TIKTOOL_API_KEY) {
+    if (!EULER_API_KEY) {
       return res.json({
         ok: false,
-        error: "Conexão TikTok ainda não ativada no servidor. Falta configurar a chave TikTool."
+        error: "Conexão TikTok ainda não ativada no servidor. Falta configurar a chave Euler Stream."
       });
     }
 
@@ -542,8 +542,8 @@ if (LICENSE_MODE === "test" && !TEST_LICENSE_KEY) {
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v8 online na porta " + PORT);
+  console.log("PalcoLive Server v9 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
-  console.log("TikTok provider: " + (TIKTOOL_API_KEY ? "TikTool configured" : "TikTool missing"));
+  console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
 });
