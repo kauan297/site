@@ -2,7 +2,7 @@
   "name": "lunadance-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Servidor central do Luna Dance",
+  "description": "Servidor central do PalcoLive",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "helmet": "^8.1.0"
+    "helmet": "^8.1.0",
+    "tiktok-live-connector": "^2.5.0"
   }
 }
