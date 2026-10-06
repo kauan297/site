@@ -13,6 +13,6 @@
   "dependencies": {
     "express": "^4.21.2",
     "helmet": "^8.1.0",
-    "tiktok-live-connector": "^2.5.0"
+    "ws": "^8.18.3"
   }
 }
