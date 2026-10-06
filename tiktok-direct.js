@@ -16,14 +16,29 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
   }
 
   function viewerKey(data) {
+    const user = data?.user || data?.fromUser || {};
     return String(
-      data?.user?.userId ||
-      data?.user?.uniqueId ||
+      user?.userId ||
+      user?.id ||
+      user?.uniqueId ||
+      user?.displayId ||
       data?.senderUserId ||
       data?.userId ||
       data?.uniqueId ||
       ""
     );
+  }
+
+  function getGiftName(data) {
+    return String(
+      data?.giftName ||
+      data?.gift_name ||
+      data?.gift?.name ||
+      data?.giftDetails?.giftName ||
+      data?.giftDetails?.name ||
+      data?.extendedGiftInfo?.name ||
+      ""
+    ).trim();
   }
 
   function buildGiftMap(gifts) {
@@ -37,10 +52,31 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
 
   function safeJson(raw) {
     try {
-      return JSON.parse(Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw));
+      const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
+      return JSON.parse(text);
     } catch {
       return null;
     }
+  }
+
+  function unpackPacket(packet) {
+    if (!packet) return [];
+    if (Array.isArray(packet)) return packet.flatMap(unpackPacket);
+    if (Array.isArray(packet.messages)) return packet.messages.flatMap(unpackPacket);
+    if (Array.isArray(packet.events)) return packet.events.flatMap(unpackPacket);
+    return [packet];
+  }
+
+  function closeMessage(code, reason) {
+    const text = String(reason || "").trim();
+    if (code === 4404) return "A conta não está AO VIVO ou a LIVE não foi encontrada.";
+    if (code === 4401) return "A chave Euler Stream foi recusada.";
+    if (code === 4403) return "A conta Euler Stream não tem permissão para esta conexão.";
+    if (code === 4429) return "Limite de conexões simultâneas atingido.";
+    if (code === 4005) return "A LIVE terminou.";
+    if (code === 4555) return "A conexão atingiu o tempo máximo e precisa reconectar.";
+    if (code === 4556 || code === 4557) return "O provedor não conseguiu localizar os dados da LIVE.";
+    return text || ("Conexão encerrada (" + code + ").");
   }
 
   async function stop(sid) {
@@ -49,7 +85,6 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
 
     state.desired = false;
     active.delete(sid);
-
     try {
       state.ws.removeAllListeners();
       state.ws.close(1000, "PalcoLive stop");
@@ -63,22 +98,23 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     await stop(sid);
 
     if (!apiKey) {
-      const error = new Error("Falta ativar a conexão TikTok no servidor. Configure a chave do provedor TikTok.");
-      error.code = "TIKTOK_PROVIDER_NOT_CONFIGURED";
-      throw error;
+      throw new Error("Falta configurar a chave Euler Stream no servidor.");
     }
 
     const cleanUsername = normalizeUsername(username);
     const giftMap = buildGiftMap(gifts);
     const viewerMap = new Map();
 
-    const url = new URL("wss://api.tik.tools");
+    const url = new URL("wss://ws.eulerstream.com");
     url.searchParams.set("uniqueId", cleanUsername);
     url.searchParams.set("apiKey", apiKey);
+    url.searchParams.set("features.bundleEvents", "false");
+    url.searchParams.set("features.rawMessages", "false");
+    url.searchParams.set("features.schemaVersion", "v2");
+    url.searchParams.set("features.normalizeUniqueId", "true");
+    url.searchParams.set("features.closeInactiveWebSocketAfter", "0");
 
-    const ws = new WebSocket(url.toString(), {
-      handshakeTimeout: 15000
-    });
+    const ws = new WebSocket(url.toString(), { handshakeTimeout: 15000 });
 
     const state = {
       desired: true,
@@ -110,7 +146,23 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
       active.delete(sid);
       try { ws.terminate(); } catch {}
       rejectStart(new Error("A LIVE não respondeu a tempo. Confira se ela está pública e já iniciada."));
-    }, 18000);
+    }, 20000);
+
+    function markConnected(roomId) {
+      state.status = "connected";
+      state.roomId = String(roomId || state.roomId || "");
+      state.lastError = "";
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        resolveStart({
+          ok: true,
+          status: "connected",
+          username: state.username,
+          room_id: state.roomId || null
+        });
+      }
+    }
 
     function failStart(message) {
       state.status = "error";
@@ -123,42 +175,28 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
       }
     }
 
-    ws.on("open", () => {
-      state.status = "connecting";
-    });
+    async function handleEvent(evt) {
+      const type = String(evt?.type || evt?.event || "").trim();
+      const low = type.toLowerCase();
+      const data = evt?.data || evt?.payload || evt;
 
-    ws.on("message", async (raw) => {
-      const packet = safeJson(raw);
-      if (!packet) return;
-
-      const event = String(packet.event || packet.type || "").toLowerCase();
-      const data = packet.data || packet.payload || packet;
-
-      if (event === "connected" || event === "connect") {
-        state.status = "connected";
-        state.roomId = String(data?.roomId || data?.room_id || packet?.roomId || "");
-        state.lastError = "";
-
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          resolveStart({
-            ok: true,
-            status: "connected",
-            username: state.username,
-            room_id: state.roomId || null
-          });
+      if (low === "room.status" || low === "roomstatus") {
+        const status = String(data?.state || "").toLowerCase();
+        if (status === "connected") {
+          markConnected(data?.roomId || data?.room_id);
+        } else if (status === "error" || status === "offline" || status === "ended") {
+          const msg = data?.message || (status === "offline" ? "A conta não está AO VIVO." : "A LIVE não está disponível.");
+          failStart(msg);
         }
         return;
       }
 
-      if (event === "error") {
-        const message = String(data?.message || packet?.message || "O provedor TikTok recusou a conexão.");
-        failStart(message);
+      if (low === "tiktok.connect" || low === "connect" || low === "connected") {
+        markConnected(data?.roomId || data?.room_id);
         return;
       }
 
-      if (event === "chat" || event === "comment") {
+      if (low.includes("chat")) {
         let nick = String(data?.comment || data?.text || "").trim().replace(/^@/, "");
         if (!validNick(nick)) return;
 
@@ -173,19 +211,12 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
         return;
       }
 
-      if (event === "gift") {
+      if (low.includes("gift")) {
+        const giftType = Number(data?.giftType ?? data?.gift_type ?? data?.giftDetails?.giftType ?? 0);
         const repeatEnd = data?.repeatEnd ?? data?.repeat_end;
-        const giftType = Number(data?.giftType ?? data?.gift_type ?? 0);
         if (giftType === 1 && repeatEnd === false) return;
 
-        const giftName = String(
-          data?.giftName ||
-          data?.gift_name ||
-          data?.gift?.name ||
-          data?.giftDetails?.giftName ||
-          ""
-        ).trim();
-
+        const giftName = getGiftName(data);
         const action = giftMap.get(normalizeGiftName(giftName));
         if (!action) return;
 
@@ -207,19 +238,34 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
           console.error("[TIKTOK GIFT->ROBLOX]", error?.status || "internal");
         }
       }
+    }
+
+    ws.on("open", () => {
+      state.status = "connecting";
+    });
+
+    ws.on("message", async (raw) => {
+      const packet = safeJson(raw);
+      if (!packet) return;
+      for (const evt of unpackPacket(packet)) {
+        try {
+          await handleEvent(evt);
+        } catch (error) {
+          console.error("[EULER EVENT]", error?.message || "internal");
+        }
+      }
     });
 
     ws.on("close", (code, reason) => {
       clearTimeout(timeout);
-      const message = Buffer.isBuffer(reason) ? reason.toString("utf8") : String(reason || "");
+      const message = closeMessage(code, Buffer.isBuffer(reason) ? reason.toString("utf8") : reason);
+
       if (state.desired) {
-        state.status = "disconnected";
-        state.lastError = message || ("Conexão encerrada (" + code + ").");
+        state.status = code === 4005 ? "ended" : "disconnected";
+        state.lastError = message;
       }
 
-      if (!settled) {
-        failStart(state.lastError || "A conexão com a LIVE foi encerrada antes de iniciar.");
-      }
+      if (!settled) failStart(message);
     });
 
     ws.on("error", (error) => {
@@ -238,9 +284,7 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
 
   function status(sid) {
     const state = active.get(sid);
-    if (!state) {
-      return { ok: true, status: "stopped", connected: false };
-    }
+    if (!state) return { ok: true, status: "stopped", connected: false };
 
     return {
       ok: true,
