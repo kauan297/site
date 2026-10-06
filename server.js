@@ -1,6 +1,7 @@
 const express = require("express");
 const helmet = require("helmet");
 const crypto = require("crypto");
+const createTikTokDirect = require("./tiktok-direct");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -14,7 +15,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "6");
+  res.setHeader("X-PalcoLive-Version", "7");
   next();
 });
 
@@ -281,15 +282,15 @@ async function publishRoblox(topic, message) {
 }
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 6 });
+  res.json({ name: "PalcoLive Server", ok: true, version: 7 });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 6 });
+  res.json({ ok: true, version: 7 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 6 });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 7 });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -399,6 +400,29 @@ app.post("/api/chat", handleChat);
 
 const GIFT_ACTIONS = new Set(["gigante", "gigante_dourado", "reset", "mega_fogo"]);
 
+const tiktokDirect = createTikTokDirect({
+  publishRoblox,
+  topicForSession,
+  validNick
+});
+
+function validTikTokUsername(value) {
+  return typeof value === "string" && /^[A-Za-z0-9._]{2,24}$/.test(value);
+}
+
+function readGiftConfig(body) {
+  const source = body && body.gifts;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+
+  const out = {};
+  for (const action of GIFT_ACTIONS) {
+    const name = String(source[action] || "").trim();
+    if (!name || name.length > 100) return null;
+    out[action] = name;
+  }
+  return out;
+}
+
 app.post("/api/gift", async (req, res) => {
   try {
     const session = getSession(req);
@@ -436,6 +460,53 @@ app.post("/api/gift", async (req, res) => {
   }
 });
 
+app.post("/api/tiktok/start", async (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ ok: false, error: "Sessão inválida ou expirada." });
+
+  if (limited("tiktok-start:" + session.sid, 8, 5 * 60_000)) {
+    return res.status(429).json({ ok: false, error: "Muitas tentativas de conexão. Aguarde um pouco." });
+  }
+
+  try {
+    let username = String(req.body?.username || "").trim().replace(/^@/, "");
+    const gifts = readGiftConfig(req.body);
+
+    if (!validTikTokUsername(username)) {
+      return res.status(400).json({ ok: false, error: "Usuário do TikTok inválido." });
+    }
+    if (!gifts) {
+      return res.status(400).json({ ok: false, error: "Configure os 4 presentes antes de iniciar." });
+    }
+
+    const result = await tiktokDirect.start(session, username, gifts);
+    return res.json(result);
+  } catch (error) {
+    console.error("[TIKTOK START]", String(error?.causeText || error?.message || "internal").slice(0, 300));
+    return res.status(502).json({
+      ok: false,
+      error: error?.message || "Não foi possível conectar à LIVE do TikTok."
+    });
+  }
+});
+
+app.post("/api/tiktok/stop", async (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ ok: false, error: "Sessão inválida ou expirada." });
+
+  try {
+    return res.json(await tiktokDirect.stop(session.sid));
+  } catch {
+    return res.status(500).json({ ok: false, error: "Não foi possível encerrar a conexão." });
+  }
+});
+
+app.post("/api/tiktok/status", (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ ok: false, error: "Sessão inválida ou expirada." });
+  return res.json(tiktokDirect.status(session.sid));
+});
+
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Rota não encontrada." });
 });
@@ -462,7 +533,7 @@ if (LICENSE_MODE === "test" && !TEST_LICENSE_KEY) {
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v6 online na porta " + PORT);
+  console.log("PalcoLive Server v7 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
 });
