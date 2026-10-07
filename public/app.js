@@ -8,6 +8,7 @@ const STORAGE = {
 let session = null;
 let liveConnected = false;
 let pollTimer = null;
+let mobileMode = localStorage.getItem("palcolive_mobile_mode") || "";
 
 function machineCode(){
   let v=localStorage.getItem(STORAGE.machine);
@@ -28,6 +29,40 @@ function msg(text,kind="info"){
 }
 function setStatus(id,text,kind=""){
   const el=$(id);el.textContent=text;el.className=kind;
+}
+function isMobile(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia("(max-width: 680px)").matches;
+}
+function applyMobileFlow(mode){
+  mobileMode=mode||"";
+  if(mobileMode) localStorage.setItem("palcolive_mobile_mode",mobileMode);
+  if(!isMobile()) return;
+
+  $("flowTitle").textContent = mobileMode==="two" ? "Mobile com 2 celulares" : "Mobile com 1 celular";
+  $("flowHint").textContent = mobileMode==="two"
+    ? "Celular A transmite o Roblox. Neste celular, configure e conecte a LIVE."
+    : "Primeiro inicie a LIVE no TikTok com jogo/tela. Depois volte aqui: configure, conecte a LIVE e abra o Roblox.";
+
+  const parent=$("mainCard");
+  const setup=$("setupBtn"), live=$("liveBtn"), roblox=$("openRobloxBtn");
+
+  if(mobileMode==="two"){
+    setup.querySelector("span").textContent="1";
+    live.querySelector("span").textContent="2";
+    roblox.querySelector("span").textContent="3";
+    setup.querySelector("b").textContent="CONFIGURAÇÃO INICIAL";
+    live.querySelector("small").textContent="deixe comentários e presentes conectados";
+    roblox.querySelector("small").textContent="use no celular que vai transmitir o jogo";
+  }else{
+    setup.querySelector("span").textContent="1";
+    live.querySelector("span").textContent="2";
+    roblox.querySelector("span").textContent="3";
+    live.querySelector("small").textContent="conecte antes de sair deste painel";
+    roblox.querySelector("small").textContent="abre o Roblox depois da LIVE conectada";
+  }
+  parent.insertBefore(setup,parent.querySelector(".split"));
+  parent.insertBefore(live,parent.querySelector(".split"));
+  parent.insertBefore(roblox,parent.querySelector(".split"));
 }
 async function api(path,body={},token=""){
   const headers={"Content-Type":"application/json","X-PalcoLive-Device":machineCode()};
@@ -105,11 +140,23 @@ $("setupForm").addEventListener("submit",(e)=>{
   setStatus("stTikTok","@"+u,"");
   msg("Configuração salva. Agora abra o palco Roblox.","ok");
 });
+$("onePhoneBtn").addEventListener("click",()=>{
+  applyMobileFlow("one");
+  msg("Modo 1 celular selecionado. Inicie a LIVE no TikTok com transmissão de jogo/tela; depois volte aqui, conecte a LIVE e abra o Roblox.","ok");
+});
+$("twoPhoneBtn").addEventListener("click",()=>{
+  applyMobileFlow("two");
+  msg("Modo 2 celulares selecionado. Deixe este celular como painel e use o outro para Roblox + transmissão.","ok");
+});
 $("openRobloxBtn").addEventListener("click",async()=>{
   const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente neste aparelho.","warn");return}
   const place=s.place_id, room=s.room_id;
   if(!place||!room){msg("Servidor não retornou o palco.","error");return}
-  msg("Abrindo o Roblox. Se estiver no celular, aceite abrir o app Roblox.");
+  if(isMobile() && mobileMode!=="two" && !liveConnected){
+    const go=confirm("No modo 1 celular, o ideal é CONECTAR A LIVE antes de abrir o Roblox.\n\nQuer abrir o Roblox mesmo assim?");
+    if(!go) return;
+  }
+  msg("Abrindo o Roblox. No celular, aceite abrir o app Roblox.");
   window.location.href="https://www.roblox.com/games/start?placeId="+encodeURIComponent(place)+"&launchData="+encodeURIComponent(room);
 });
 async function updateLiveStatus(){
@@ -151,7 +198,16 @@ async function boot(){
   await config();
   const ok=await login();
   applyMainState(!!ok);
-  if(ok){msg("Pronto. Abra o palco e conecte sua LIVE.","ok");await updateLiveStatus()}
+  if(isMobile()){
+    applyMobileFlow(mobileMode || "one");
+    $("mobileCard").classList.remove("hidden");
+  }
+  if(ok){
+    msg(isMobile()
+      ? "Pronto. No celular, inicie a LIVE com jogo/tela, conecte aqui e depois abra o Roblox."
+      : "Pronto. Abra o palco e conecte sua LIVE.","ok");
+    await updateLiveStatus()
+  }
   pollTimer=setInterval(()=>{if(session)updateLiveStatus().catch(()=>{})},5000);
   if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
