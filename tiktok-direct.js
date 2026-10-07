@@ -105,14 +105,12 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     const giftMap = buildGiftMap(gifts);
     const viewerMap = new Map();
 
+    // Keep the connection URL deliberately minimal. Euler's own WebSocket
+    // quickstart uses only uniqueId + apiKey; defaults handle event bundling
+    // and schema negotiation. This avoids provider-side option drift.
     const url = new URL("wss://ws.eulerstream.com");
     url.searchParams.set("uniqueId", cleanUsername);
     url.searchParams.set("apiKey", apiKey);
-    url.searchParams.set("features.bundleEvents", "false");
-    url.searchParams.set("features.rawMessages", "false");
-    url.searchParams.set("features.schemaVersion", "v2");
-    url.searchParams.set("features.normalizeUniqueId", "true");
-    url.searchParams.set("features.closeInactiveWebSocketAfter", "0");
 
     const ws = new WebSocket(url.toString(), { handshakeTimeout: 15000 });
 
@@ -240,13 +238,28 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
       }
     }
 
+    let openGraceTimer = null;
+
     ws.on("open", () => {
       state.status = "connecting";
+
+      // The managed Euler socket may not emit a dedicated room.status event
+      // on every successful connection. Give the server a short grace period
+      // to reject offline/invalid streams, then treat an open socket as ready.
+      openGraceTimer = setTimeout(() => {
+        if (!settled && ws.readyState === WebSocket.OPEN && state.desired) {
+          markConnected(state.roomId);
+        }
+      }, 1500);
     });
 
     ws.on("message", async (raw) => {
       const packet = safeJson(raw);
       if (!packet) return;
+
+      // Receiving any valid frame confirms the managed socket is alive.
+      if (!settled) markConnected(state.roomId);
+
       for (const evt of unpackPacket(packet)) {
         try {
           await handleEvent(evt);
@@ -258,6 +271,7 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
 
     ws.on("close", (code, reason) => {
       clearTimeout(timeout);
+      if (openGraceTimer) clearTimeout(openGraceTimer);
       const message = closeMessage(code, Buffer.isBuffer(reason) ? reason.toString("utf8") : reason);
 
       if (state.desired) {
@@ -269,6 +283,7 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     });
 
     ws.on("error", (error) => {
+      if (openGraceTimer) clearTimeout(openGraceTimer);
       failStart(error?.message || "Falha de rede ao conectar à LIVE.");
     });
 
