@@ -38,7 +38,8 @@
     </section>
 
     <section class="card hidden" id="mainCard">
-      <h2>Só 3 passos</h2>
+      <h2 id="flowTitle">Só 3 passos</h2>
+      <p id="flowHint">No PC: configure, abra o Roblox e conecte a LIVE.</p>
 
       <button id="setupBtn" class="step">
         <span>1</span>
@@ -66,9 +67,15 @@
       <p id="message">Ative sua licença para começar.</p>
     </section>
 
-    <section class="card info">
-      <h3>Como usar no mobile</h3>
-      <p>Você pode controlar pelo celular. Se o Roblox estiver no PC, use a mesma licença nos dois aparelhos. Para jogar no próprio celular, abra o palco neste aparelho depois de conectar a LIVE.</p>
+    <section class="card info" id="mobileCard">
+      <h3>MODO MOBILE — SEM PC</h3>
+      <p><b>1 celular:</b> inicie a LIVE no TikTok usando o modo de jogo/compartilhamento de tela, volte ao PalcoLive, conecte a LIVE e só depois abra o Roblox. O servidor continua ouvindo comentários e presentes mesmo com este painel em segundo plano.</p>
+      <p><b>2 celulares:</b> é a opção mobile mais estável. Celular A transmite o Roblox; Celular B fica com este painel aberto para controlar a LIVE.</p>
+      <p id="mobileAvailability">A opção de transmitir jogo/tela depende dos recursos liberados pelo TikTok para a conta e o aparelho.</p>
+      <div class="split">
+        <button id="onePhoneBtn" class="secondary">USAR 1 CELULAR</button>
+        <button id="twoPhoneBtn" class="secondary">USAR 2 CELULARES</button>
+      </div>
     </section>
   </main>
 
