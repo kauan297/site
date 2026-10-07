@@ -1,6 +1,7 @@
 const express = require("express");
 const helmet = require("helmet");
 const crypto = require("crypto");
+const path = require("path");
 const createTikTokDirect = require("./tiktok-direct");
 
 const app = express();
@@ -15,7 +16,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "9");
+  res.setHeader("X-PalcoLive-Version", "10");
   next();
 });
 
@@ -82,6 +83,48 @@ function validMachineCode(value) {
 
 function hashDevice(machineCode) {
   return crypto.createHash("sha256").update("palcolive-device:" + machineCode).digest("hex");
+}
+
+function credentialKey() {
+  return crypto.createHash("sha256").update("palcolive-credential:" + SESSION_SECRET).digest();
+}
+
+function encryptDeviceCredential(data, machineCode) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", credentialKey(), iv);
+  cipher.setAAD(Buffer.from("device:" + machineCode, "utf8"));
+  const plain = Buffer.from(JSON.stringify(data), "utf8");
+  const encrypted = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [
+    "v1",
+    iv.toString("base64url"),
+    encrypted.toString("base64url"),
+    tag.toString("base64url")
+  ].join(".");
+}
+
+function decryptDeviceCredential(value, machineCode) {
+  if (typeof value !== "string") return null;
+  const parts = value.split(".");
+  if (parts.length !== 4 || parts[0] !== "v1") return null;
+
+  try {
+    const iv = Buffer.from(parts[1], "base64url");
+    const encrypted = Buffer.from(parts[2], "base64url");
+    const tag = Buffer.from(parts[3], "base64url");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", credentialKey(), iv);
+    decipher.setAAD(Buffer.from("device:" + machineCode, "utf8"));
+    decipher.setAuthTag(tag);
+    const plain = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+    return JSON.parse(plain);
+  } catch {
+    return null;
+  }
+}
+
+function sidForLicense(licenseKey) {
+  return stableRoomId("license:" + String(licenseKey || "").trim());
 }
 
 function signPayload(payload) {
@@ -282,16 +325,23 @@ async function publishRoblox(topic, message) {
   }
 }
 
+app.get("/app", (req, res) => res.redirect(302, "/app/"));
+app.use("/app", express.static(path.join(__dirname, "public"), {
+  extensions: ["html"],
+  etag: true,
+  maxAge: "10m"
+}));
+
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 9 });
+  res.json({ name: "PalcoLive Server", ok: true, version: 10, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 9 });
+  res.json({ ok: true, version: 10 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 9 });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 10, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY) });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -317,8 +367,12 @@ app.post("/api/activate", async (req, res) => {
 
     if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
 
-    const sid = stableRoomId((auth.instanceId || licenseKey) + ":" + hashDevice(machineCode));
+    const sid = sidForLicense(licenseKey);
     const session = createSessionToken(sid, auth, machineCode);
+    const deviceCredential = encryptDeviceCredential({
+      licenseKey,
+      instanceId: auth.instanceId || null
+    }, machineCode);
 
     return res.json({
       ok: true,
@@ -326,6 +380,7 @@ app.post("/api/activate", async (req, res) => {
       room_id: sid,
       place_id: ROBLOX_PLACE_ID,
       session_token: session.token,
+      device_credential: deviceCredential,
       expires_at: session.expiresAt
     });
   } catch (error) {
@@ -358,7 +413,7 @@ app.post("/api/login", async (req, res) => {
 
     if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
 
-    const sid = stableRoomId((auth.instanceId || licenseKey) + ":" + hashDevice(machineCode));
+    const sid = sidForLicense(licenseKey);
     const session = createSessionToken(sid, auth, machineCode);
 
     return res.json({
@@ -372,6 +427,54 @@ app.post("/api/login", async (req, res) => {
   } catch (error) {
     console.error("[LOGIN]", error.status || "internal");
     return res.status(error.status || 500).json({ ok: false, error: "Falha ao validar a licença." });
+  }
+});
+
+app.post("/api/login-device", async (req, res) => {
+  if (limited("auth:" + clientIp(req), 40, 5 * 60_000)) {
+    return res.status(429).json({ ok: false, error: "Muitas tentativas. Aguarde um pouco." });
+  }
+
+  try {
+    const body = req.body || {};
+    const machineCode = String(body.machine_code || body.machineCode || "").trim().toUpperCase();
+    const credential = String(body.device_credential || body.deviceCredential || "").trim();
+
+    if (!validMachineCode(machineCode) || credential.length < 20 || credential.length > 4096) {
+      return res.status(400).json({ ok: false, error: "Credencial do dispositivo inválida." });
+    }
+
+    const stored = decryptDeviceCredential(credential, machineCode);
+    if (!stored || typeof stored.licenseKey !== "string") {
+      return res.status(401).json({ ok: false, error: "Credencial inválida neste dispositivo." });
+    }
+
+    const licenseKey = stored.licenseKey.trim();
+    const instanceId = stored.instanceId || null;
+
+    const auth = await authorizeLicense({
+      licenseKey,
+      instanceId,
+      deviceName: "PalcoLive Web " + machineCode.slice(0, 8),
+      machineCode
+    });
+
+    if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
+
+    const sid = sidForLicense(licenseKey);
+    const session = createSessionToken(sid, auth, machineCode);
+
+    return res.json({
+      ok: true,
+      instance_id: auth.instanceId || instanceId,
+      room_id: sid,
+      place_id: ROBLOX_PLACE_ID,
+      session_token: session.token,
+      expires_at: session.expiresAt
+    });
+  } catch (error) {
+    console.error("[LOGIN DEVICE]", error.status || "internal");
+    return res.status(error.status || 500).json({ ok: false, error: "Falha ao validar este dispositivo." });
   }
 });
 
@@ -542,7 +645,7 @@ if (LICENSE_MODE === "test" && !TEST_LICENSE_KEY) {
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v9 online na porta " + PORT);
+  console.log("PalcoLive Server v10 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
