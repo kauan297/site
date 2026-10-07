@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d1017">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PalcoLive</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <h1>PALCOLIVE</h1>
+        <p>TikTok LIVE → Roblox</p>
+      </div>
+      <span class="chip">PC + MOBILE</span>
+    </header>
+
+    <section class="status-grid">
+      <div class="status"><span>Licença</span><strong id="stLicense">pendente</strong></div>
+      <div class="status"><span>Servidor</span><strong id="stServer">verificando</strong></div>
+      <div class="status"><span>TikTok</span><strong id="stTikTok">configurar</strong></div>
+      <div class="status"><span>Live</span><strong id="stLive">parada</strong></div>
+    </section>
+
+    <section class="card" id="activationCard">
+      <h2>Primeiro acesso</h2>
+      <p>Ative uma vez neste aparelho.</p>
+      <div class="row">
+        <input id="licenseInput" type="password" placeholder="Licença" autocomplete="off">
+        <button id="activateBtn" class="primary">ATIVAR</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="mainCard">
+      <h2>Só 3 passos</h2>
+
+      <button id="setupBtn" class="step">
+        <span>1</span>
+        <div><b>CONFIGURAÇÃO INICIAL</b><small>@ do TikTok + presentes</small></div>
+      </button>
+
+      <button id="openRobloxBtn" class="step accent">
+        <span>2</span>
+        <div><b>ABRIR PALCO ROBLOX</b><small>abre o palco deste cliente</small></div>
+      </button>
+
+      <button id="liveBtn" class="step success">
+        <span>3</span>
+        <div><b id="liveBtnText">CONECTAR LIVE</b><small>comentários e presentes em tempo real</small></div>
+      </button>
+
+      <div class="split">
+        <button id="testBtn" class="secondary">TESTAR CONEXÃO</button>
+        <button id="forgetBtn" class="secondary dangerText">SAIR DESTE APARELHO</button>
+      </div>
+    </section>
+
+    <section class="card note">
+      <h3 id="messageTitle">PRONTO</h3>
+      <p id="message">Ative sua licença para começar.</p>
+    </section>
+
+    <section class="card info">
+      <h3>Como usar no mobile</h3>
+      <p>Você pode controlar pelo celular. Se o Roblox estiver no PC, use a mesma licença nos dois aparelhos. Para jogar no próprio celular, abra o palco neste aparelho depois de conectar a LIVE.</p>
+    </section>
+  </main>
+
+  <dialog id="setupDialog">
+    <form method="dialog" id="setupForm">
+      <header class="dialogHeader">
+        <div><h2>Configuração inicial</h2><p>Configure uma vez e salve.</p></div>
+        <button value="cancel" class="iconBtn" aria-label="Fechar">×</button>
+      </header>
+
+      <label>@ do TikTok
+        <input id="tiktokUser" type="text" placeholder="lunaadanca" autocapitalize="none">
+      </label>
+
+      <div class="giftGrid">
+        <label>GRANDE
+          <input id="giftGrande" list="giftCatalog" value="Rose">
+        </label>
+        <label>GRANDE DOURADO
+          <input id="giftDourado" list="giftCatalog" value="Finger Heart">
+        </label>
+        <label>MEGA FOGO
+          <input id="giftFogo" list="giftCatalog" value="Rosa">
+        </label>
+        <label>RESET
+          <input id="giftReset" list="giftCatalog" value="Galaxy">
+        </label>
+      </div>
+
+      <datalist id="giftCatalog">
+        <option value="Rose"></option>
+        <option value="Team Bracelet"></option>
+        <option value="Finger Heart"></option>
+        <option value="Rosa"></option>
+        <option value="Bravo!"></option>
+        <option value="Perfume"></option>
+        <option value="Doughnut"></option>
+        <option value="Butterfly"></option>
+        <option value="Paper Crane"></option>
+        <option value="Hand Heart"></option>
+        <option value="Sunglasses"></option>
+        <option value="Corgi"></option>
+        <option value="Money Gun"></option>
+        <option value="Swan"></option>
+        <option value="Galaxy"></option>
+      </datalist>
+
+      <button id="saveSetupBtn" value="default" class="primary wide">SALVAR CONFIGURAÇÃO</button>
+    </form>
+  </dialog>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
