@@ -9,6 +9,8 @@ let session = null;
 let liveConnected = false;
 let pollTimer = null;
 let mobileMode = localStorage.getItem("palcolive_mobile_mode") || "";
+let liveWanted = localStorage.getItem("palcolive_live_wanted") === "1";
+let autoRecovering = false;
 
 function machineCode(){
   let v=localStorage.getItem(STORAGE.machine);
@@ -163,14 +165,37 @@ async function updateLiveStatus(){
   const s=await ensureSession(); if(!s)return;
   const d=await api("/api/tiktok/status",{},s.session_token);
   liveConnected=!!d.connected;
-  setStatus("stLive",liveConnected?"ativa":"parada",liveConnected?"ok":"");
-  $("liveBtnText").textContent=liveConnected?"DESCONECTAR LIVE":"CONECTAR LIVE";
-  if(liveConnected)setStatus("stTikTok","conectado","ok");
+
+  if(liveConnected){
+    setStatus("stLive","ativa","ok");
+    $("liveBtnText").textContent="DESCONECTAR LIVE";
+    setStatus("stTikTok","conectado","ok");
+    return;
+  }
+
+  const status=String(d.status||"stopped");
+  setStatus("stLive",status==="reconnecting"?"reconectando":"parada",status==="reconnecting"?"warn":"");
+  $("liveBtnText").textContent=status==="reconnecting"?"RECONECTANDO...":"CONECTAR LIVE";
+
+  if(liveWanted && status==="stopped" && !autoRecovering && username()){
+    autoRecovering=true;
+    try{
+      const r=await api("/api/tiktok/start",{username:username(),gifts:gifts()},s.session_token);
+      if(r.ok){
+        liveConnected=true;
+        setStatus("stLive","ativa","ok");
+        setStatus("stTikTok","conectado","ok");
+        $("liveBtnText").textContent="DESCONECTAR LIVE";
+        msg("LIVE reconectada automaticamente.","ok");
+      }
+    }finally{autoRecovering=false}
+  }
 }
 $("liveBtn").addEventListener("click",async()=>{
   const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente.","warn");return}
   if(liveConnected){
     const d=await api("/api/tiktok/stop",{},s.session_token);
+    liveWanted=false;localStorage.removeItem("palcolive_live_wanted");
     liveConnected=false;setStatus("stLive","parada","");$("liveBtnText").textContent="CONECTAR LIVE";
     setStatus("stTikTok",username()?"@"+username():"configurar","");
     msg(d.ok?"Live desconectada.":(d.error||"Falha ao desconectar."),d.ok?"ok":"error"); return;
@@ -181,6 +206,7 @@ $("liveBtn").addEventListener("click",async()=>{
   const d=await api("/api/tiktok/start",{username:u,gifts:gifts()},s.session_token);
   $("liveBtn").disabled=false;
   if(!d.ok){$("liveBtnText").textContent="CONECTAR LIVE";msg(d.error||"Não foi possível conectar.","error");return}
+  liveWanted=true;localStorage.setItem("palcolive_live_wanted","1");
   liveConnected=true;setStatus("stLive","ativa","ok");setStatus("stTikTok","conectado","ok");
   $("liveBtnText").textContent="DESCONECTAR LIVE";
   msg("LIVE conectada. Agora um viewer pode comentar o nick Roblox.","ok");
