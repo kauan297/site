@@ -74,9 +74,20 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     if (code === 4403) return "A conta Euler Stream não tem permissão para esta conexão.";
     if (code === 4429) return "Limite de conexões simultâneas atingido.";
     if (code === 4005) return "A LIVE terminou.";
-    if (code === 4555) return "A conexão atingiu o tempo máximo e precisa reconectar.";
+    if (code === 4555) return "Tempo máximo da conexão atingido.";
     if (code === 4556 || code === 4557) return "O provedor não conseguiu localizar os dados da LIVE.";
     return text || ("Conexão encerrada (" + code + ").");
+  }
+
+  function isTerminalClose(code) {
+    return code === 1000 || code === 4005 || code === 4401 || code === 4403 || code === 4404;
+  }
+
+  function socketUrl(username) {
+    const url = new URL("wss://ws.eulerstream.com");
+    url.searchParams.set("uniqueId", username);
+    url.searchParams.set("apiKey", apiKey);
+    return url.toString();
   }
 
   async function stop(sid) {
@@ -84,10 +95,15 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     if (!state) return { ok: true, status: "stopped" };
 
     state.desired = false;
+    if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+    if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
     active.delete(sid);
+
     try {
-      state.ws.removeAllListeners();
-      state.ws.close(1000, "PalcoLive stop");
+      if (state.ws) {
+        state.ws.removeAllListeners();
+        state.ws.close(1000, "PalcoLive stop");
+      }
     } catch {}
 
     return { ok: true, status: "stopped" };
@@ -97,80 +113,60 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
     const sid = session.sid;
     await stop(sid);
 
-    if (!apiKey) {
-      throw new Error("Falta configurar a chave Euler Stream no servidor.");
-    }
+    if (!apiKey) throw new Error("Falta configurar a chave Euler Stream no servidor.");
 
     const cleanUsername = normalizeUsername(username);
-    const giftMap = buildGiftMap(gifts);
-    const viewerMap = new Map();
-
-    // Keep the connection URL deliberately minimal. Euler's own WebSocket
-    // quickstart uses only uniqueId + apiKey; defaults handle event bundling
-    // and schema negotiation. This avoids provider-side option drift.
-    const url = new URL("wss://ws.eulerstream.com");
-    url.searchParams.set("uniqueId", cleanUsername);
-    url.searchParams.set("apiKey", apiKey);
-
-    const ws = new WebSocket(url.toString(), { handshakeTimeout: 15000 });
-
     const state = {
+      sid,
       desired: true,
-      ws,
+      ws: null,
       username: cleanUsername,
       status: "connecting",
       roomId: "",
       lastError: "",
-      viewerMap,
-      giftMap,
-      startedAt: Date.now()
+      viewerMap: new Map(),
+      giftMap: buildGiftMap(gifts),
+      startedAt: Date.now(),
+      lastEventAt: 0,
+      reconnectCount: 0,
+      reconnectTimer: null,
+      heartbeatTimer: null,
+      connecting: false
     };
     active.set(sid, state);
 
-    let settled = false;
-    let resolveStart;
-    let rejectStart;
+    let initialSettled = false;
+    let resolveInitial;
+    let rejectInitial;
 
-    const started = new Promise((resolve, reject) => {
-      resolveStart = resolve;
-      rejectStart = reject;
+    const initialPromise = new Promise((resolve, reject) => {
+      resolveInitial = resolve;
+      rejectInitial = reject;
     });
 
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      state.status = "error";
-      state.lastError = "Tempo esgotado ao conectar à LIVE.";
-      active.delete(sid);
-      try { ws.terminate(); } catch {}
-      rejectStart(new Error("A LIVE não respondeu a tempo. Confira se ela está pública e já iniciada."));
-    }, 20000);
+    function settleInitialOk() {
+      if (initialSettled) return;
+      initialSettled = true;
+      resolveInitial({
+        ok: true,
+        status: "connected",
+        username: state.username,
+        room_id: state.roomId || null
+      });
+    }
+
+    function settleInitialError(message) {
+      if (initialSettled) return;
+      initialSettled = true;
+      rejectInitial(new Error(String(message || "Não foi possível conectar à LIVE.")));
+    }
 
     function markConnected(roomId) {
       state.status = "connected";
       state.roomId = String(roomId || state.roomId || "");
       state.lastError = "";
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        resolveStart({
-          ok: true,
-          status: "connected",
-          username: state.username,
-          room_id: state.roomId || null
-        });
-      }
-    }
-
-    function failStart(message) {
-      state.status = "error";
-      state.lastError = String(message || "Falha ao conectar à LIVE").slice(0, 300);
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        active.delete(sid);
-        rejectStart(new Error(state.lastError));
-      }
+      state.reconnectCount = 0;
+      settleInitialOk();
     }
 
     async function handleEvent(evt) {
@@ -180,13 +176,27 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
 
       if (low === "room.status" || low === "roomstatus") {
         const status = String(data?.state || "").toLowerCase();
+
         if (status === "connected") {
           markConnected(data?.roomId || data?.room_id);
-        } else if (status === "error" || status === "offline" || status === "ended") {
-          const msg = data?.message || (status === "offline" ? "A conta não está AO VIVO." : "A LIVE não está disponível.");
-          failStart(msg);
+          return;
         }
-        return;
+
+        if (status === "reconnecting" || status === "connecting") {
+          state.status = status;
+          return;
+        }
+
+        if (status === "offline" || status === "ended" || status === "error") {
+          state.status = status;
+          state.lastError = String(
+            data?.message ||
+            (status === "offline" ? "A conta não está AO VIVO." : "A LIVE não está disponível.")
+          ).slice(0, 300);
+
+          if (!initialSettled) settleInitialError(state.lastError);
+          return;
+        }
       }
 
       if (low === "tiktok.connect" || low === "connect" || low === "connected") {
@@ -195,14 +205,15 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
       }
 
       if (low.includes("chat")) {
-        let nick = String(data?.comment || data?.text || "").trim().replace(/^@/, "");
+        const nick = String(data?.comment || data?.text || "").trim().replace(/^@/, "");
         if (!validNick(nick)) return;
 
         const key = viewerKey(data);
-        if (key) viewerMap.set(key, nick);
+        if (key) state.viewerMap.set(key, nick);
 
         try {
           await publishRoblox(topicForSession(sid), { type: "chat", nick });
+          console.log("[TIKTOK CHAT] enviado ao Roblox");
         } catch (error) {
           console.error("[TIKTOK CHAT->ROBLOX]", error?.status || "internal");
         }
@@ -215,13 +226,13 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
         if (giftType === 1 && repeatEnd === false) return;
 
         const giftName = getGiftName(data);
-        const action = giftMap.get(normalizeGiftName(giftName));
+        const action = state.giftMap.get(normalizeGiftName(giftName));
         if (!action) return;
 
         let nick = "";
         if (action !== "reset") {
           const key = viewerKey(data);
-          nick = key ? viewerMap.get(key) || "" : "";
+          nick = key ? state.viewerMap.get(key) || "" : "";
           if (!validNick(nick)) return;
         }
 
@@ -232,67 +243,158 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
             action,
             duration: 0
           });
+          console.log("[TIKTOK GIFT] enviado ao Roblox");
         } catch (error) {
           console.error("[TIKTOK GIFT->ROBLOX]", error?.status || "internal");
         }
       }
     }
 
-    let openGraceTimer = null;
+    function scheduleReconnect(message) {
+      if (!state.desired || active.get(sid) !== state || state.reconnectTimer) return;
 
-    ws.on("open", () => {
-      state.status = "connecting";
+      state.status = "reconnecting";
+      state.lastError = String(message || "Reconectando ao TikTok...").slice(0, 300);
+      state.reconnectCount += 1;
 
-      // The managed Euler socket may not emit a dedicated room.status event
-      // on every successful connection. Give the server a short grace period
-      // to reject offline/invalid streams, then treat an open socket as ready.
-      openGraceTimer = setTimeout(() => {
-        if (!settled && ws.readyState === WebSocket.OPEN && state.desired) {
-          markConnected(state.roomId);
-        }
-      }, 1500);
-    });
+      const delay = Math.min(15000, 1200 * Math.pow(1.7, Math.min(state.reconnectCount - 1, 5)));
+      console.log("[TIKTOK RECONNECT] tentativa " + state.reconnectCount + " em " + Math.round(delay) + "ms");
 
-    ws.on("message", async (raw) => {
-      const packet = safeJson(raw);
-      if (!packet) return;
+      state.reconnectTimer = setTimeout(() => {
+        state.reconnectTimer = null;
+        connectSocket(false);
+      }, delay);
+    }
 
-      // Receiving any valid frame confirms the managed socket is alive.
-      if (!settled) markConnected(state.roomId);
+    function connectSocket(initialAttempt) {
+      if (!state.desired || active.get(sid) !== state || state.connecting) return;
 
-      for (const evt of unpackPacket(packet)) {
-        try {
-          await handleEvent(evt);
-        } catch (error) {
-          console.error("[EULER EVENT]", error?.message || "internal");
+      state.connecting = true;
+      state.status = initialAttempt ? "connecting" : "reconnecting";
+
+      const ws = new WebSocket(socketUrl(state.username), { handshakeTimeout: 15000 });
+      state.ws = ws;
+
+      let openGraceTimer = null;
+      let initialTimeout = null;
+      let gotPong = true;
+
+      function cleanupTimers() {
+        if (openGraceTimer) clearTimeout(openGraceTimer);
+        if (initialTimeout) clearTimeout(initialTimeout);
+        if (state.heartbeatTimer) {
+          clearInterval(state.heartbeatTimer);
+          state.heartbeatTimer = null;
         }
       }
-    });
 
-    ws.on("close", (code, reason) => {
-      clearTimeout(timeout);
-      if (openGraceTimer) clearTimeout(openGraceTimer);
-      const message = closeMessage(code, Buffer.isBuffer(reason) ? reason.toString("utf8") : reason);
+      if (initialAttempt) {
+        initialTimeout = setTimeout(() => {
+          if (initialSettled || !state.desired) return;
+          state.lastError = "A LIVE não respondeu a tempo. Confira se ela está pública e já iniciada.";
+          try { ws.terminate(); } catch {}
+          settleInitialError(state.lastError);
+        }, 20000);
+      }
 
-      if (state.desired) {
-        state.status = code === 4005 ? "ended" : "disconnected";
+      ws.on("open", () => {
+        state.connecting = false;
+        gotPong = true;
+
+        openGraceTimer = setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN && state.desired) {
+            markConnected(state.roomId);
+          }
+        }, 1500);
+
+        state.heartbeatTimer = setInterval(() => {
+          if (!state.desired || state.ws !== ws) return;
+          if (ws.readyState !== WebSocket.OPEN) return;
+
+          if (!gotPong) {
+            try { ws.terminate(); } catch {}
+            return;
+          }
+
+          gotPong = false;
+          try { ws.ping(); } catch {}
+        }, 20000);
+      });
+
+      ws.on("pong", () => {
+        gotPong = true;
+      });
+
+      ws.on("message", async (raw) => {
+        const packet = safeJson(raw);
+        if (!packet) return;
+
+        state.lastEventAt = Date.now();
+        gotPong = true;
+
+        if (!initialSettled) markConnected(state.roomId);
+
+        for (const evt of unpackPacket(packet)) {
+          try {
+            await handleEvent(evt);
+          } catch (error) {
+            console.error("[EULER EVENT]", error?.message || "internal");
+          }
+        }
+      });
+
+      ws.on("close", (code, reason) => {
+        cleanupTimers();
+        state.connecting = false;
+
+        if (!state.desired || active.get(sid) !== state) return;
+
+        const message = closeMessage(
+          code,
+          Buffer.isBuffer(reason) ? reason.toString("utf8") : reason
+        );
+
         state.lastError = message;
-      }
+        state.status = code === 4005 ? "ended" : "disconnected";
 
-      if (!settled) failStart(message);
-    });
+        if (!initialSettled && isTerminalClose(code)) {
+          active.delete(sid);
+          settleInitialError(message);
+          return;
+        }
 
-    ws.on("error", (error) => {
-      if (openGraceTimer) clearTimeout(openGraceTimer);
-      failStart(error?.message || "Falha de rede ao conectar à LIVE.");
-    });
+        if (isTerminalClose(code)) {
+          console.log("[TIKTOK CLOSE] terminal " + code + " - " + message);
+          return;
+        }
+
+        scheduleReconnect(message);
+      });
+
+      ws.on("error", (error) => {
+        cleanupTimers();
+        state.connecting = false;
+        state.lastError = String(error?.message || "Falha de rede ao conectar à LIVE.").slice(0, 300);
+
+        if (!initialSettled && initialAttempt) {
+          // close normally follows; leave the final decision to the close handler.
+          return;
+        }
+
+        scheduleReconnect(state.lastError);
+      });
+    }
+
+    connectSocket(true);
 
     try {
-      return await started;
+      return await initialPromise;
     } catch (error) {
       state.desired = false;
+      if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+      if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
       active.delete(sid);
-      try { ws.terminate(); } catch {}
+      try { state.ws?.terminate(); } catch {}
       throw error;
     }
   }
@@ -307,7 +409,9 @@ module.exports = function createTikTokDirect({ publishRoblox, topicForSession, v
       connected: state.status === "connected",
       username: state.username,
       room_id: state.roomId || null,
-      last_error: state.lastError || null
+      last_error: state.lastError || null,
+      reconnect_count: state.reconnectCount,
+      last_event_at: state.lastEventAt ? new Date(state.lastEventAt).toISOString() : null
     };
   }
 
