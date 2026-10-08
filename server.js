@@ -325,6 +325,23 @@ async function publishRoblox(topic, message) {
   }
 }
 
+const TEST_FALLBACK_TOPIC = "LunaDance_TESTE_FALLBACK";
+
+async function publishRobloxSession(topic, message) {
+  await publishRoblox(topic, message);
+
+  // Enquanto LICENSE_MODE=test, envia também por um tópico de segurança.
+  // Isso evita perder comentários caso o launchData/servidor reservado do Roblox
+  // não tenha conectado à sala dinâmica. Em modo comercial este fallback NÃO roda.
+  if (LICENSE_MODE === "test" && topic !== TEST_FALLBACK_TOPIC) {
+    try {
+      await publishRoblox(TEST_FALLBACK_TOPIC, message);
+    } catch (error) {
+      console.error("[ROBLOX TEST FALLBACK]", error?.status || "internal");
+    }
+  }
+}
+
 app.get("/app", (req, res) => res.redirect(302, "/app/"));
 app.use("/app", express.static(path.join(__dirname, "public"), {
   extensions: ["html"],
@@ -491,7 +508,7 @@ async function handleChat(req, res) {
     if (typeof nick === "string") nick = nick.trim().replace(/^@/, "");
     if (!validNick(nick)) return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
 
-    await publishRoblox(topicForSession(session.sid), { type: "chat", nick });
+    await publishRobloxSession(topicForSession(session.sid), { type: "chat", nick });
     return res.json({ ok: true });
   } catch (error) {
     console.error("[CHAT]", error.status || "internal");
@@ -505,7 +522,7 @@ app.post("/api/chat", handleChat);
 const GIFT_ACTIONS = new Set(["gigante", "gigante_dourado", "reset", "mega_fogo"]);
 
 const tiktokDirect = createTikTokDirect({
-  publishRoblox,
+  publishRoblox: publishRobloxSession,
   topicForSession,
   validNick,
   apiKey: EULER_API_KEY
@@ -551,7 +568,7 @@ app.post("/api/gift", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Nick Roblox inválido." });
     }
 
-    await publishRoblox(topicForSession(session.sid), {
+    await publishRobloxSession(topicForSession(session.sid), {
       type: "gift_action",
       nick: action === "reset" ? "" : nick,
       action,
