@@ -83,7 +83,7 @@ async function config(){
   try{
     const r=await fetch("/api/config",{cache:"no-store"}); const d=await r.json();
     setStatus("stServer","online","ok");
-    if(!d.tiktokReady) msg("Servidor online. Falta apenas configurar a chave do provedor TikTok no Render.","warn");
+    if(!d.tiktokReady) msg("Servidor online. Falta apenas configurar a conexão TikTok.","warn");
     return d;
   }catch{setStatus("stServer","offline","bad");return null}
 }
@@ -116,7 +116,7 @@ $("activateBtn").addEventListener("click",async()=>{
     if(!d.device_credential) throw new Error("Servidor não retornou a credencial segura.");
     localStorage.setItem(STORAGE.credential,d.device_credential);
     session=d;$("licenseInput").value="";
-    applyMainState(true);msg("Ativado. Este aparelho recebeu uma sala exclusiva. Faça a configuração inicial.","ok");
+    applyMainState(true);msg("Licença ativada. Este aparelho recebeu uma sala exclusiva. Faça a configuração inicial.","ok");
   }catch(e){msg(e.message,"error")}
   finally{$("activateBtn").disabled=false;$("activateBtn").textContent="ATIVAR"}
 });
@@ -246,9 +246,26 @@ $("testBtn").addEventListener("click",async()=>{
   const d=await api("/api/comment",{nick:"Knzz0102"},s.session_token);
   msg(d.ok?"Teste enviado. Procure o avatar Knzz0102 no palco.":(d.error||"Falha no teste."),d.ok?"ok":"error");
 });
-$("forgetBtn").addEventListener("click",()=>{
-  if(!confirm("Sair do PalcoLive neste aparelho?"))return;
-  localStorage.removeItem(STORAGE.credential);session=null;liveConnected=false;applyMainState(false);msg("Este aparelho saiu do PalcoLive.");
+$("forgetBtn").addEventListener("click",async()=>{
+  if(!confirm("Sair deste aparelho e liberar esta ativação?"))return;
+
+  const credential=localStorage.getItem(STORAGE.credential);
+  try{
+    if(credential){
+      await api("/api/deactivate-device",{
+        device_credential:credential,
+        machine_code:machineCode()
+      });
+    }
+  }catch{}
+
+  localStorage.removeItem(STORAGE.credential);
+  localStorage.removeItem("palcolive_live_wanted");
+  session=null;
+  liveConnected=false;
+  liveWanted=false;
+  applyMainState(false);
+  msg("Este aparelho saiu do PalcoLive e a ativação foi liberada quando aplicável.","ok");
 });
 async function boot(){
   await config();
