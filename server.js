@@ -503,7 +503,12 @@ app.post("/api/admin/license", (req, res) => {
   }
 });
 
-app.get("/app", (req, res) => res.redirect(302, "/app/"));
+// Express matches "/app" and "/app/" by default.
+// Never redirect an already canonical "/app/" request to itself.
+app.get("/app", (req, res, next) => {
+  if (req.path === "/app/") return next();
+  return res.redirect(302, "/app/");
+});
 app.get("/termos", (req, res) => res.redirect(302, "/app/termos.html"));
 app.get("/privacidade", (req, res) => res.redirect(302, "/app/privacidade.html"));
 app.use("/app", express.static(path.join(__dirname, "public"), {
