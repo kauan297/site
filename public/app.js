@@ -284,4 +284,18 @@ async function boot(){
   pollTimer=setInterval(()=>{if(session)updateLiveStatus().catch(()=>{})},5000);
   if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
+$("deviceCode").textContent=machineCode();
+$("copyDeviceBtn").addEventListener("click",async()=>{
+  const code=machineCode();
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(code);
+      msg("Código do aparelho copiado. Envie ao vendedor para receber sua licença.","ok");
+    }else{
+      window.prompt("Copie este código e envie ao vendedor:",code);
+    }
+  }catch{
+    window.prompt("Copie este código e envie ao vendedor:",code);
+  }
+});
 boot();
