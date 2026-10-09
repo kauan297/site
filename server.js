@@ -441,6 +441,9 @@ async function publishRobloxSession(topic, message) {
 app.get("/admin", (req, res) => res.redirect(302, "/app/admin.html"));
 
 app.post("/api/admin/license", (req, res) => {
+  if (LICENSE_MODE !== "manual" && LICENSE_MODE !== "hybrid") {
+    return res.status(503).json({ ok: false, error: "Ative LICENSE_MODE=manual no Render antes de emitir licenças." });
+  }
   if (limited("admin:" + clientIp(req), 20, 5 * 60_000)) {
     return res.status(429).json({ ok: false, error: "Muitas tentativas." });
   }
