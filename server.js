@@ -16,7 +16,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "11");
+  res.setHeader("X-PalcoLive-Version", "12");
   next();
 });
 
@@ -242,36 +242,17 @@ async function lemonRequest(path, fields) {
 }
 
 function productMatches(meta) {
-  if (!LEMON_PRODUCT_ID) return true;
+  if (!LEMON_PRODUCT_ID) return false;
   return String(meta && meta.product_id) === LEMON_PRODUCT_ID;
 }
 
-async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCode }) {
-  if (!validMachineCode(machineCode)) {
-    return { ok: false, error: "Dispositivo inválido." };
-  }
+function commercialModeEnabled() {
+  return LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid";
+}
 
-  if (LICENSE_MODE === "test") {
-    if (!TEST_LICENSE_KEY || !secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
-      return { ok: false, error: "Licença de teste inválida." };
-    }
-    return {
-      ok: true,
-      mode: "test",
-      instanceId: "test-" + hashDevice(machineCode).slice(0, 16)
-    };
-  }
-
-  if (LICENSE_MODE === "off") {
-    return {
-      ok: true,
-      mode: "off",
-      instanceId: "development-" + hashDevice(machineCode).slice(0, 16)
-    };
-  }
-
-  if (LICENSE_MODE !== "lemonsqueezy") {
-    return { ok: false, error: "Sistema de licença indisponível." };
+async function authorizeLemonLicense({ licenseKey, instanceId, deviceName }) {
+  if (!LEMON_PRODUCT_ID) {
+    return { ok: false, error: "Licenciamento comercial ainda não configurado." };
   }
 
   if (!licenseKey || typeof licenseKey !== "string" || licenseKey.length > 256) {
@@ -297,11 +278,11 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
 
   const activation = await lemonRequest("/v1/licenses/activate", {
     license_key: licenseKey.trim(),
-    instance_name: String(deviceName || "PalcoLive PC").slice(0, 100)
+    instance_name: String(deviceName || "PalcoLive").slice(0, 100)
   });
 
   if (!activation.activated || !productMatches(activation.meta)) {
-    return { ok: false, error: "Não foi possível ativar esta licença." };
+    return { ok: false, error: "Não foi possível ativar esta licença neste aparelho." };
   }
 
   return {
@@ -309,6 +290,55 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
     mode: "lemonsqueezy",
     instanceId: activation.instance?.id || null
   };
+}
+
+async function deactivateLemonLicense({ licenseKey, instanceId }) {
+  if (!licenseKey || !instanceId) return { ok: true, deactivated: false };
+
+  const result = await lemonRequest("/v1/licenses/deactivate", {
+    license_key: String(licenseKey).trim(),
+    instance_id: String(instanceId).slice(0, 128)
+  });
+
+  return {
+    ok: Boolean(result.deactivated),
+    deactivated: Boolean(result.deactivated)
+  };
+}
+
+async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCode }) {
+  if (!validMachineCode(machineCode)) {
+    return { ok: false, error: "Dispositivo inválido." };
+  }
+
+  if (LICENSE_MODE === "off") {
+    return {
+      ok: true,
+      mode: "off",
+      instanceId: "development-" + hashDevice(machineCode).slice(0, 16)
+    };
+  }
+
+  // TESTE continua disponível para o dono mesmo quando o modo híbrido estiver ativo.
+  if (LICENSE_MODE === "test" || LICENSE_MODE === "hybrid") {
+    if (TEST_LICENSE_KEY && secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
+      return {
+        ok: true,
+        mode: "test",
+        instanceId: "test-" + hashDevice(machineCode).slice(0, 16)
+      };
+    }
+
+    if (LICENSE_MODE === "test") {
+      return { ok: false, error: "Licença de teste inválida." };
+    }
+  }
+
+  if (LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid") {
+    return authorizeLemonLicense({ licenseKey, instanceId, deviceName });
+  }
+
+  return { ok: false, error: "Sistema de licença indisponível." };
 }
 
 async function publishRoblox(topic, message) {
@@ -345,6 +375,8 @@ async function publishRobloxSession(topic, message) {
 }
 
 app.get("/app", (req, res) => res.redirect(302, "/app/"));
+app.get("/termos", (req, res) => res.redirect(302, "/app/termos.html"));
+app.get("/privacidade", (req, res) => res.redirect(302, "/app/privacidade.html"));
 app.use("/app", express.static(path.join(__dirname, "public"), {
   extensions: ["html"],
   etag: true,
@@ -352,15 +384,15 @@ app.use("/app", express.static(path.join(__dirname, "public"), {
 }));
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 11, app: "/app/" });
+  res.json({ name: "PalcoLive Server", ok: true, version: 12, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 11 });
+  res.json({ ok: true, version: 12 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 11, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 12, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled() && Boolean(LEMON_PRODUCT_ID) });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -494,6 +526,65 @@ app.post("/api/login-device", async (req, res) => {
   } catch (error) {
     console.error("[LOGIN DEVICE]", error.status || "internal");
     return res.status(error.status || 500).json({ ok: false, error: "Falha ao validar este dispositivo." });
+  }
+});
+
+app.post("/api/deactivate-device", async (req, res) => {
+  try {
+    const machineCode = String(req.body?.machine_code || req.body?.machineCode || "").trim().toUpperCase();
+    const credential = String(req.body?.device_credential || req.body?.deviceCredential || "").trim();
+
+    if (!validMachineCode(machineCode) || credential.length < 20 || credential.length > 4096) {
+      return res.status(400).json({ ok: false, error: "Credencial do dispositivo inválida." });
+    }
+
+    const stored = decryptDeviceCredential(credential, machineCode);
+    if (!stored || typeof stored.licenseKey !== "string") {
+      return res.status(401).json({ ok: false, error: "Credencial inválida neste dispositivo." });
+    }
+
+    const licenseKey = stored.licenseKey.trim();
+    const instanceId = stored.instanceId || null;
+
+    if (LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid") {
+      try {
+        const result = await deactivateLemonLicense({ licenseKey, instanceId });
+        return res.json({ ok: true, deactivated: result.deactivated });
+      } catch (error) {
+        console.error("[DEACTIVATE DEVICE]", error.status || "internal");
+        return res.status(error.status || 500).json({ ok: false, error: "Não foi possível liberar esta ativação." });
+      }
+    }
+
+    return res.json({ ok: true, deactivated: false });
+  } catch {
+    return res.status(500).json({ ok: false, error: "Não foi possível sair deste aparelho." });
+  }
+});
+
+app.post("/api/deactivate", async (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ ok: false, error: "Sessão inválida ou expirada." });
+
+  try {
+    const licenseKey = String(req.body?.license_key || req.body?.licenseKey || "").trim();
+    const instanceId = String(req.body?.instance_id || req.body?.instanceId || "").trim();
+
+    if (session.licenseMode === "lemonsqueezy") {
+      if (!licenseKey || !instanceId || !secureEqualText(session.sid, sidForLicense(licenseKey))) {
+        return res.status(403).json({ ok: false, error: "Esta licença não pertence à sessão atual." });
+      }
+
+      const result = await deactivateLemonLicense({ licenseKey, instanceId });
+      await tiktokDirect.stop(session.sid).catch(() => {});
+      return res.json({ ok: true, deactivated: result.deactivated });
+    }
+
+    await tiktokDirect.stop(session.sid).catch(() => {});
+    return res.json({ ok: true, deactivated: false });
+  } catch (error) {
+    console.error("[DEACTIVATE]", error.status || "internal");
+    return res.status(error.status || 500).json({ ok: false, error: "Não foi possível liberar esta ativação." });
   }
 });
 
@@ -658,13 +749,21 @@ if (!ROBLOX_API_KEY) {
   console.error("ERRO: ROBLOX_API_KEY não configurada.");
   process.exit(1);
 }
-if (LICENSE_MODE === "test" && !TEST_LICENSE_KEY) {
+if ((LICENSE_MODE === "test" || LICENSE_MODE === "hybrid") && !TEST_LICENSE_KEY) {
   console.error("ERRO: TEST_LICENSE_KEY não configurada.");
+  process.exit(1);
+}
+if (commercialModeEnabled() && !LEMON_PRODUCT_ID) {
+  console.error("ERRO: LEMON_PRODUCT_ID obrigatório no modo comercial/híbrido.");
+  process.exit(1);
+}
+if (!["test", "hybrid", "lemonsqueezy", "off"].includes(LICENSE_MODE)) {
+  console.error("ERRO: LICENSE_MODE inválido.");
   process.exit(1);
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v11 online na porta " + PORT);
+  console.log("PalcoLive Server v12 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
