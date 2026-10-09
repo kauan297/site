@@ -1,4 +1,4 @@
-const CACHE="palcolive-app-v7";
+const CACHE="palcolive-app-v8";
 const SHELL=["/app/","/app/styles.css","/app/app.js","/app/manifest.webmanifest","/app/icon.svg","/app/termos.html","/app/privacidade.html"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL))));
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
