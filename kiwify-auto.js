@@ -132,15 +132,14 @@ module.exports = function createKiwifyAuto({
     const emailDigest = digestEmail(data.Customer?.email);
     const event = String(data.webhook_event_type || "").trim().toLowerCase();
     const status = String(data.order_status || "").trim().toLowerCase();
-    if (!/^[A-Za-z0-9_-]{8,128}$/.test(orderId) || !emailDigest || orderRef.length > 128) {
-      return res.status(422).json({ ok: false, error: "Pedido incompleto." });
-    }
-
     const isApproved = (event === "order_approved" || event === "subscription_renewed") && status === "paid";
     const isRevoked = ["order_refunded", "chargeback", "subscription_canceled", "subscription_late"].includes(event)
       || ["refunded", "chargedback"].includes(status);
 
     if (!isApproved && !isRevoked) return res.json({ ok: true, ignored: "evento" });
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(orderId) || orderRef.length > 128 || (isApproved && !emailDigest)) {
+      return res.status(422).json({ ok: false, error: "Pedido incompleto." });
+    }
 
     try {
       await ready();
@@ -153,7 +152,7 @@ module.exports = function createKiwifyAuto({
          "state = CASE WHEN palcolive_kiwify_orders.state = 'revoked' THEN 'revoked' ELSE EXCLUDED.state END,",
          "updated_at = NOW()",
          "RETURNING order_id, device_digest, state"].join(" "),
-        [orderId, orderRef, productId, emailDigest, state]
+        [orderId, orderRef, productId, emailDigest || "removed-by-kiwify", state]
       );
 
       if (saved.rows[0]?.state === "revoked" && saved.rows[0]?.device_digest) {
