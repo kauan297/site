@@ -23,6 +23,54 @@ function gifts(){
   try{return JSON.parse(localStorage.getItem(STORAGE.gifts))||defaultGifts()}catch{return defaultGifts()}
 }
 function defaultGifts(){return {gigante:"Rose",gigante_dourado:"Finger Heart",mega_fogo:"Rosa",reset:"Galaxy"}}
+
+const GIFT_CATALOG = [
+  "Rose","Finger Heart","Rosa","Galaxy","Team Bracelet","Bravo!",
+  "Perfume","Doughnut","Butterfly","Paper Crane","Hand Heart",
+  "Sunglasses","Corgi","Money Gun","Swan"
+];
+const GIFT_FIELDS = [
+  {key:"gigante", select:"giftGrandeSelect", custom:"giftGrande"},
+  {key:"gigante_dourado", select:"giftDouradoSelect", custom:"giftDourado"},
+  {key:"mega_fogo", select:"giftFogoSelect", custom:"giftFogo"},
+  {key:"reset", select:"giftResetSelect", custom:"giftReset"}
+];
+function syncGiftCustomField(field, focus=false){
+  const select=$(field.select), custom=$(field.custom);
+  const isCustom=select.value==="__custom__";
+  custom.classList.toggle("hidden",!isCustom);
+  custom.required=isCustom;
+  if(isCustom && focus) custom.focus();
+}
+function initializeGiftSelectors(){
+  for(const field of GIFT_FIELDS){
+    const select=$(field.select);
+    select.add(new Option("Toque aqui para escolher", ""));
+    for(const giftName of GIFT_CATALOG){
+      select.add(new Option(giftName,giftName));
+    }
+    select.add(new Option("Outro presente (digitar nome)", "__custom__"));
+    select.addEventListener("change",()=>syncGiftCustomField(field,true));
+  }
+}
+function showCurrentGifts(current){
+  for(const field of GIFT_FIELDS){
+    const choice=String(current[field.key]||"").trim();
+    const select=$(field.select), custom=$(field.custom);
+    custom.value=choice;
+    select.value=GIFT_CATALOG.includes(choice)?choice:(choice?"__custom__":"");
+    syncGiftCustomField(field);
+  }
+}
+function selectedGifts(){
+  const result={};
+  for(const field of GIFT_FIELDS){
+    const choice=$(field.select).value;
+    result[field.key]=choice==="__custom__"?$(field.custom).value.trim():choice.trim();
+  }
+  return result;
+}
+
 function username(){return (localStorage.getItem(STORAGE.username)||"").trim().replace(/^@/,"")}
 function msg(text,kind="info"){
   $("message").textContent=text;
@@ -127,32 +175,66 @@ $("activateBtn").addEventListener("click",async()=>{
   }catch(e){msg(e.message,"error")}
   finally{$("activateBtn").disabled=false;$("activateBtn").textContent="ATIVAR"}
 });
+initializeGiftSelectors();
 $("setupBtn").addEventListener("click",()=>{
-  const g=gifts();
   $("tiktokUser").value=username();
-  $("giftGrande").value=g.gigante;
-  $("giftDourado").value=g.gigante_dourado;
-  $("giftFogo").value=g.mega_fogo;
-  $("giftReset").value=g.reset;
+  showCurrentGifts(gifts());
   $("setupDialog").showModal();
 });
-$("setupForm").addEventListener("submit",(e)=>{
+$("setupForm").addEventListener("submit",async(e)=>{
   e.preventDefault();
   const u=$("tiktokUser").value.trim().replace(/^@/,"");
-  if(!/^[A-Za-z0-9._]{2,24}$/.test(u)){msg("Digite um @ do TikTok válido.","warn");return}
-  const g={
-    gigante:$("giftGrande").value.trim(),
-    gigante_dourado:$("giftDourado").value.trim(),
-    mega_fogo:$("giftFogo").value.trim(),
-    reset:$("giftReset").value.trim()
-  };
-  if(Object.values(g).some(v=>!v)){msg("Escolha os 4 presentes.","warn");return}
-  if(new Set(Object.values(g).map(v=>v.toLowerCase())).size<4){msg("Use um presente diferente para cada efeito.","warn");return}
+  if(!/^[A-Za-z0-9._]{2,24}$/.test(u)){
+    msg("Digite um @ do TikTok válido.","warn");
+    return;
+  }
+  const g=selectedGifts();
+  if(Object.values(g).some(v=>!v||v.length>100)){
+    msg("Escolha um presente em cada um dos 4 campos.","warn");
+    return;
+  }
+  if(new Set(Object.values(g).map(v=>v.normalize("NFKC").toLowerCase())).size<4){
+    msg("Escolha um presente diferente para cada efeito.","warn");
+    return;
+  }
+
   localStorage.setItem(STORAGE.username,u);
   localStorage.setItem(STORAGE.gifts,JSON.stringify(g));
   $("setupDialog").close();
   setStatus("stTikTok","@"+u,"");
-  msg("Configuração salva. Agora abra o palco Roblox.","ok");
+
+  if(!liveConnected){
+    msg("Presentes salvos! Eles serão usados na próxima conexão com a LIVE.","ok");
+    return;
+  }
+
+  msg("Presentes salvos. Reconectando sua LIVE para aplicar as mudanças...");
+  const s=await ensureSession();
+  if(!s?.session_token){
+    liveConnected=false;
+    msg("Presentes salvos, mas a sessão expirou. Ative novamente e conecte a LIVE.","warn");
+    return;
+  }
+
+  try{
+    const answer=await api("/api/tiktok/start",{username:u,gifts:g},s.session_token);
+    if(!answer.ok)throw new Error(answer.error||"Não foi possível reconectar a LIVE.");
+    liveConnected=true;
+    liveWanted=true;
+    localStorage.setItem("palcolive_live_wanted","1");
+    setStatus("stLive","ativa","ok");
+    setStatus("stTikTok","conectado","ok");
+    $("liveBtnText").textContent="DESCONECTAR LIVE";
+    msg("Novos presentes aplicados. LIVE reconectada com sucesso!","ok");
+  }catch(error){
+    liveConnected=false;
+    liveWanted=false;
+    localStorage.removeItem("palcolive_live_wanted");
+    setStatus("stLive","parada","");
+    setStatus("stTikTok","@"+u,"");
+    $("liveBtnText").textContent="CONECTAR LIVE";
+    msg("Presentes salvos, mas a LIVE não reconectou: "+(error.message||"Tente novamente.")+". Toque em CONECTAR LIVE.","warn");
+  }
 });
 $("onePhoneBtn").addEventListener("click",()=>{
   applyMobileFlow("one");
