@@ -111,38 +111,26 @@
         <input id="tiktokUser" type="text" placeholder="lunaadanca" autocapitalize="none">
       </label>
 
+      <p class="giftHelp">Toque em cada campo para escolher um presente. Se não encontrar o nome na lista, selecione <b>Outro presente (digitar)</b>.</p>
       <div class="giftGrid">
         <label>GRANDE
-          <input id="giftGrande" list="giftCatalog" value="Rose">
+          <select id="giftGrandeSelect" class="giftSelect" aria-label="Presente para GRANDE"></select>
+          <input id="giftGrande" class="giftCustom hidden" type="text" placeholder="Nome exato do presente" maxlength="100" autocomplete="off">
         </label>
         <label>GRANDE DOURADO
-          <input id="giftDourado" list="giftCatalog" value="Finger Heart">
+          <select id="giftDouradoSelect" class="giftSelect" aria-label="Presente para GRANDE DOURADO"></select>
+          <input id="giftDourado" class="giftCustom hidden" type="text" placeholder="Nome exato do presente" maxlength="100" autocomplete="off">
         </label>
         <label>MEGA FOGO
-          <input id="giftFogo" list="giftCatalog" value="Rosa">
+          <select id="giftFogoSelect" class="giftSelect" aria-label="Presente para MEGA FOGO"></select>
+          <input id="giftFogo" class="giftCustom hidden" type="text" placeholder="Nome exato do presente" maxlength="100" autocomplete="off">
         </label>
         <label>RESET
-          <input id="giftReset" list="giftCatalog" value="Galaxy">
+          <select id="giftResetSelect" class="giftSelect" aria-label="Presente para RESET"></select>
+          <input id="giftReset" class="giftCustom hidden" type="text" placeholder="Nome exato do presente" maxlength="100" autocomplete="off">
         </label>
       </div>
-
-      <datalist id="giftCatalog">
-        <option value="Rose"></option>
-        <option value="Team Bracelet"></option>
-        <option value="Finger Heart"></option>
-        <option value="Rosa"></option>
-        <option value="Bravo!"></option>
-        <option value="Perfume"></option>
-        <option value="Doughnut"></option>
-        <option value="Butterfly"></option>
-        <option value="Paper Crane"></option>
-        <option value="Hand Heart"></option>
-        <option value="Sunglasses"></option>
-        <option value="Corgi"></option>
-        <option value="Money Gun"></option>
-        <option value="Swan"></option>
-        <option value="Galaxy"></option>
-      </datalist>
+      <p class="giftFootnote">O nome deve corresponder ao que a conexão TikTok recebe. Se você mudar os presentes durante uma LIVE conectada, o PalcoLive vai reconectar para aplicar as mudanças.</p>
 
       <button id="saveSetupBtn" value="default" class="primary wide">SALVAR CONFIGURAÇÃO</button>
     </form>
