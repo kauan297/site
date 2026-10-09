@@ -16,7 +16,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "12");
+  res.setHeader("X-PalcoLive-Version", "13");
   next();
 });
 
@@ -27,6 +27,7 @@ const ROBLOX_PLACE_ID = process.env.ROBLOX_PLACE_ID || "76605256587436";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const LICENSE_MODE = (process.env.LICENSE_MODE || "test").toLowerCase();
 const TEST_LICENSE_KEY = String(process.env.TEST_LICENSE_KEY || "").trim();
+const ADMIN_SECRET = String(process.env.ADMIN_SECRET || "").trim();
 const LEMON_PRODUCT_ID = String(process.env.LEMON_PRODUCT_ID || "").trim();
 const SESSION_HOURS = Math.max(1, Math.min(6, Number(process.env.SESSION_HOURS || 6)));
 const EULER_API_KEY = String(process.env.EULER_API_KEY || "").trim();
@@ -147,6 +148,56 @@ function signPayload(payload) {
   return body + "." + sig;
 }
 
+function createManualLicense(machineCode, days, label) {
+  if (!validMachineCode(machineCode)) throw new Error("Código do aparelho inválido.");
+  const created = nowSeconds();
+  const safeDays = Math.max(0, Math.min(3650, Number(days || 0)));
+  const exp = safeDays > 0 ? created + Math.floor(safeDays * 86400) : 0;
+  const licenseId = crypto.randomBytes(8).toString("hex");
+  const payload = {
+    v: 1,
+    aud: "palcolive-license",
+    lic: licenseId,
+    dev: hashDevice(machineCode),
+    iat: created,
+    exp,
+    label: String(label || "").slice(0, 80)
+  };
+  return "PL1." + signPayload(payload);
+}
+
+function verifyManualLicense(licenseKey, machineCode) {
+  if (typeof licenseKey !== "string" || !licenseKey.startsWith("PL1.")) return null;
+  if (!validMachineCode(machineCode)) return null;
+  const token = licenseKey.slice(4);
+  if (!token.includes(".")) return null;
+
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+
+  const expected = crypto.createHmac("sha256", SESSION_SECRET).update(body).digest();
+  let received;
+  try {
+    received = Buffer.from(sig, "base64url");
+  } catch {
+    return null;
+  }
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) return null;
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+
+  if (payload.v !== 1 || payload.aud !== "palcolive-license") return null;
+  if (!payload.lic || typeof payload.lic !== "string") return null;
+  if (!payload.dev || !secureEqualText(payload.dev, hashDevice(machineCode))) return null;
+  if (payload.exp && Number(payload.exp) > 0 && Number(payload.exp) < nowSeconds()) return null;
+  return payload;
+}
+
 function verifyToken(token) {
   if (!token || typeof token !== "string" || !token.includes(".")) return null;
   const [body, sig] = token.split(".");
@@ -247,7 +298,7 @@ function productMatches(meta) {
 }
 
 function commercialModeEnabled() {
-  return LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid";
+  return ["manual", "lemonsqueezy", "hybrid"].includes(LICENSE_MODE);
 }
 
 async function authorizeLemonLicense({ licenseKey, instanceId, deviceName }) {
@@ -319,23 +370,36 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
     };
   }
 
-  // TESTE continua disponível para o dono mesmo quando o modo híbrido estiver ativo.
-  if (LICENSE_MODE === "test" || LICENSE_MODE === "hybrid") {
-    if (TEST_LICENSE_KEY && secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
+  // Chave do dono para testes internos.
+  if (["test", "manual", "hybrid"].includes(LICENSE_MODE) && TEST_LICENSE_KEY && secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
+    return {
+      ok: true,
+      mode: "test",
+      instanceId: "test-" + hashDevice(machineCode).slice(0, 16)
+    };
+  }
+
+  // Licença comercial manual, gerada pelo painel do vendedor e presa ao aparelho.
+  if (LICENSE_MODE === "manual" || LICENSE_MODE === "hybrid") {
+    const manual = verifyManualLicense(licenseKey, machineCode);
+    if (manual) {
       return {
         ok: true,
-        mode: "test",
-        instanceId: "test-" + hashDevice(machineCode).slice(0, 16)
+        mode: "manual",
+        instanceId: "manual-" + manual.lic
       };
     }
-
-    if (LICENSE_MODE === "test") {
-      return { ok: false, error: "Licença de teste inválida." };
+    if (LICENSE_MODE === "manual") {
+      return { ok: false, error: "Licença inválida, expirada ou emitida para outro aparelho." };
     }
   }
 
   if (LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid") {
     return authorizeLemonLicense({ licenseKey, instanceId, deviceName });
+  }
+
+  if (LICENSE_MODE === "test") {
+    return { ok: false, error: "Licença de teste inválida." };
   }
 
   return { ok: false, error: "Sistema de licença indisponível." };
@@ -374,6 +438,43 @@ async function publishRobloxSession(topic, message) {
   await publishRoblox(topic, message);
 }
 
+app.get("/admin", (req, res) => res.redirect(302, "/app/admin.html"));
+
+app.post("/api/admin/license", (req, res) => {
+  if (limited("admin:" + clientIp(req), 20, 5 * 60_000)) {
+    return res.status(429).json({ ok: false, error: "Muitas tentativas." });
+  }
+
+  const supplied = String(req.headers["x-palcolive-admin"] || "");
+  if (!ADMIN_SECRET || !secureEqualText(supplied, ADMIN_SECRET)) {
+    return res.status(403).json({ ok: false, error: "Senha do vendedor inválida." });
+  }
+
+  const machineCode = String(req.body?.machine_code || "").trim().toUpperCase();
+  const days = Number(req.body?.days || 0);
+  const label = String(req.body?.label || "").trim();
+
+  if (!validMachineCode(machineCode)) {
+    return res.status(400).json({ ok: false, error: "Código do aparelho inválido." });
+  }
+  if (!Number.isFinite(days) || days < 0 || days > 3650) {
+    return res.status(400).json({ ok: false, error: "Duração inválida." });
+  }
+
+  try {
+    const licenseKey = createManualLicense(machineCode, days, label);
+    return res.json({
+      ok: true,
+      license_key: licenseKey,
+      machine_code: machineCode,
+      days,
+      lifetime: days === 0
+    });
+  } catch {
+    return res.status(500).json({ ok: false, error: "Não foi possível gerar a licença." });
+  }
+});
+
 app.get("/app", (req, res) => res.redirect(302, "/app/"));
 app.get("/termos", (req, res) => res.redirect(302, "/app/termos.html"));
 app.get("/privacidade", (req, res) => res.redirect(302, "/app/privacidade.html"));
@@ -384,15 +485,15 @@ app.use("/app", express.static(path.join(__dirname, "public"), {
 }));
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 12, app: "/app/" });
+  res.json({ name: "PalcoLive Server", ok: true, version: 13, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 12 });
+  res.json({ ok: true, version: 13 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 12, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled() && Boolean(LEMON_PRODUCT_ID) });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 13, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled() });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -749,21 +850,25 @@ if (!ROBLOX_API_KEY) {
   console.error("ERRO: ROBLOX_API_KEY não configurada.");
   process.exit(1);
 }
-if ((LICENSE_MODE === "test" || LICENSE_MODE === "hybrid") && !TEST_LICENSE_KEY) {
+if (["test", "manual", "hybrid"].includes(LICENSE_MODE) && !TEST_LICENSE_KEY) {
   console.error("ERRO: TEST_LICENSE_KEY não configurada.");
   process.exit(1);
 }
-if (commercialModeEnabled() && !LEMON_PRODUCT_ID) {
-  console.error("ERRO: LEMON_PRODUCT_ID obrigatório no modo comercial/híbrido.");
+if ((LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid") && !LEMON_PRODUCT_ID) {
+  console.error("ERRO: LEMON_PRODUCT_ID obrigatório no modo LemonSqueezy/híbrido.");
   process.exit(1);
 }
-if (!["test", "hybrid", "lemonsqueezy", "off"].includes(LICENSE_MODE)) {
+if ((LICENSE_MODE === "manual" || LICENSE_MODE === "hybrid") && ADMIN_SECRET.length < 16) {
+  console.error("ERRO: ADMIN_SECRET ausente ou fraco.");
+  process.exit(1);
+}
+if (!["test", "manual", "hybrid", "lemonsqueezy", "off"].includes(LICENSE_MODE)) {
   console.error("ERRO: LICENSE_MODE inválido.");
   process.exit(1);
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v12 online na porta " + PORT);
+  console.log("PalcoLive Server v13 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
