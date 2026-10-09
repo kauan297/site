@@ -15,8 +15,14 @@ module.exports = function createKiwifyAuto({
   const product = String(process.env.KIWIFY_PRODUCT_ID || "").trim();
   const token = String(process.env.KIWIFY_WEBHOOK_TOKEN || "");
   const databaseUrl = String(process.env.DATABASE_URL || "");
+  // Uma compra única libera uma licença por tempo definido; 0 = vitalícia somente
+  // se o vendedor configurar isso de propósito. Padrão seguro: 30 dias.
+  const configuredDays = Number(process.env.KIWIFY_LICENSE_DAYS ?? 30);
+  const licenseDays = Number.isInteger(configuredDays) && configuredDays >= 0 && configuredDays <= 3650
+    ? configuredDays : NaN;
   const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
-    && product.length >= 8 && token.length >= 24 && !!databaseUrl;
+    && product.length >= 8 && token.length >= 24 && !!databaseUrl
+    && Number.isFinite(licenseDays);
   const pool = configured ? new Pool({
     connectionString: databaseUrl,
     max: 5,
@@ -34,6 +40,7 @@ module.exports = function createKiwifyAuto({
     "email_digest TEXT NOT NULL,",
     "state TEXT NOT NULL CHECK (state IN ('paid','revoked')),",
     "device_digest TEXT DEFAULT NULL,",
+    "expires_at TIMESTAMPTZ DEFAULT NULL,",
     "updated_at TIMESTAMPTZ DEFAULT NOW()",
     ")"
   ].join(" ");
@@ -41,7 +48,10 @@ module.exports = function createKiwifyAuto({
   async function ready() {
     if (!pool) throw new Error("Kiwify não configurada.");
     if (!readyPromise) {
-      readyPromise = pool.query(ddl).catch((error) => {
+      readyPromise = (async () => {
+        await pool.query(ddl);
+        await pool.query("ALTER TABLE palcolive_kiwify_orders ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ DEFAULT NULL");
+      })().catch((error) => {
         readyPromise = null;
         throw error;
       });
@@ -78,7 +88,7 @@ module.exports = function createKiwifyAuto({
   async function orderIsPaid(orderId, deviceDigest) {
     await ready();
     const query = await pool.query(
-      "SELECT 1 FROM palcolive_kiwify_orders WHERE order_id = $1 AND state = 'paid' AND device_digest = $2 LIMIT 1",
+      "SELECT 1 FROM palcolive_kiwify_orders WHERE order_id = $1 AND state = 'paid' AND device_digest = $2 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1",
       [orderId, deviceDigest]
     );
     return query.rowCount === 1;
@@ -145,15 +155,16 @@ module.exports = function createKiwifyAuto({
     try {
       await ready();
       const state = isRevoked ? "revoked" : "paid";
+      const expiresAt = licenseDays === 0 ? null : new Date(Date.now() + licenseDays * 86400_000);
       const saved = await pool.query(
         ["INSERT INTO palcolive_kiwify_orders",
-         "(order_id, order_ref, product_id, email_digest, state)",
-         "VALUES ($1, $2, $3, $4, $5)",
+         "(order_id, order_ref, product_id, email_digest, state, expires_at)",
+         "VALUES ($1, $2, $3, $4, $5, $6)",
          "ON CONFLICT (order_id) DO UPDATE SET",
          "state = CASE WHEN palcolive_kiwify_orders.state = 'revoked' THEN 'revoked' ELSE EXCLUDED.state END,",
          "updated_at = NOW()",
          "RETURNING order_id, device_digest, state"].join(" "),
-        [orderId, orderRef, productId, emailDigest || "removed-by-kiwify", state]
+        [orderId, orderRef, productId, emailDigest || "removed-by-kiwify", state, expiresAt]
       );
 
       if (saved.rows[0]?.state === "revoked" && saved.rows[0]?.device_digest) {
@@ -186,7 +197,7 @@ module.exports = function createKiwifyAuto({
       client = await pool.connect();
       await client.query("BEGIN");
       const find = await client.query(
-        "SELECT order_id, state, device_digest FROM palcolive_kiwify_orders WHERE email_digest=$1 AND (order_id=$2 OR order_ref=$2) FOR UPDATE",
+        "SELECT order_id, state, device_digest, expires_at FROM palcolive_kiwify_orders WHERE email_digest=$1 AND (order_id=$2 OR order_ref=$2) FOR UPDATE",
         [emailDigest, order]
       );
       if (find.rowCount !== 1 || find.rows[0].state !== "paid") {
@@ -194,6 +205,10 @@ module.exports = function createKiwifyAuto({
         return res.status(403).json({ ok: false, error: "Não encontramos uma compra aprovada com esses dados." });
       }
       const sale = find.rows[0];
+      if (sale.expires_at && Date.parse(sale.expires_at) <= Date.now()) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ ok: false, error: "O prazo de acesso desta compra terminou." });
+      }
       if (sale.device_digest && sale.device_digest !== deviceDigest) {
         await client.query("ROLLBACK");
         return res.status(403).json({ ok: false, error: "A licença já está ativada em outro aparelho. Saia do antigo antes de trocar." });
