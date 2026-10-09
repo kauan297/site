@@ -30,13 +30,24 @@
 
     <section class="card" id="activationCard">
       <h2>Primeiro acesso</h2>
-      <p>Ative uma vez neste aparelho. Se você comprou uma licença individual, primeiro envie o código abaixo ao vendedor.</p>
-      <p><b>CÓDIGO DO SEU APARELHO:</b> <code id="deviceCode">CARREGANDO...</code></p>
-      <button type="button" id="copyDeviceBtn" class="secondary">COPIAR CÓDIGO PARA O VENDEDOR</button>
+      <div id="kiwifyActivation">
+        <p>Comprou o PalcoLive pela Kiwify? Ative sozinho, sem falar com o vendedor.</p>
+        <label for="kiwifyOrder">Número / referência do pedido da Kiwify</label>
+        <input id="kiwifyOrder" type="text" autocomplete="off" placeholder="Código do pedido do recibo">
+        <label for="kiwifyEmail">E-mail usado na compra</label>
+        <input id="kiwifyEmail" type="email" autocomplete="email" placeholder="voce@exemplo.com">
+        <button type="button" id="kiwifyActivateBtn" class="primary wide">ATIVAR MINHA COMPRA AUTOMATICAMENTE</button>
+        <p id="kiwifySetupStatus" class="warn" style="margin-top:10px"></p>
+      </div>
+      <details id="manualActivation">
+        <summary style="cursor:pointer;padding:12px 0"><b>Já recebi uma chave de licença? Abrir ativação manual</b></summary>
+        <p>Código do seu aparelho: <code id="deviceCode">CARREGANDO...</code></p>
+        <button type="button" id="copyDeviceBtn" class="secondary">COPIAR CÓDIGO</button>
+      </details>
       <p style="font-size:12px">Ao ativar, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
-      <div class="row">
-        <input id="licenseInput" type="password" placeholder="Licença" autocomplete="off">
-        <button id="activateBtn" class="primary">ATIVAR</button>
+      <div class="row" id="manualLicenseRow">
+        <input id="licenseInput" type="password" placeholder="Chave de licença manual" autocomplete="off">
+        <button id="activateBtn" class="primary">ATIVAR CHAVE</button>
       </div>
     </section>
 
