@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PalcoLive — Painel do Vendedor</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#0d1017;color:#f5f7fc;font:16px Arial,sans-serif}
+main{max-width:610px;margin:28px auto;padding:20px}
+h1{margin:0 0 8px}p{line-height:1.55;color:#c5d0e2}
+.card{background:#1a2130;border:1px solid #3b4561;border-radius:16px;padding:24px}
+label{display:block;font-weight:700;margin-top:16px}
+input,select{width:100%;font:inherit;background:#0f1625;color:white;border:1px solid #53617b;border-radius:10px;padding:13px;margin-top:8px}
+button{border:0;background:#685bf5;color:white;border-radius:10px;padding:14px;font-weight:700;cursor:pointer;margin-top:16px}
+button:disabled{opacity:.5;cursor:wait}
+#licenseOut{word-break:break-all;font-family:monospace;white-space:pre-wrap;background:#080e18;border:1px solid #53617b;padding:15px;border-radius:8px}
+#error{color:#ffaaa2}
+small{color:#b9c9df}
+a{color:#91cfff}
+</style>
+</head>
+<body>
+<main>
+<h1>PalcoLive — Vendedor</h1>
+<p>Este painel é reservado ao dono. Emita uma licença individual depois de receber o pagamento e o código do aparelho do cliente.</p>
+<div class="card">
+<form id="form">
+<label for="admin">Senha de administrador</label>
+<input id="admin" type="password" autocomplete="off" required placeholder="Senha ADMIN_SECRET do Render">
+<label for="machine">Código do aparelho do cliente</label>
+<input id="machine" type="text" autocomplete="off" autocapitalize="characters" maxlength="20" pattern="[A-Fa-f0-9]{20}" required placeholder="20 letras/números">
+<label for="days">Duração</label>
+<select id="days"><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="90">90 dias</option><option value="365">365 dias</option><option value="0">Vitalícia (sem vencimento)</option></select>
+<label for="label">Identificação do cliente (opcional)</label>
+<input id="label" type="text" maxlength="80" placeholder="Nome ou número do pedido">
+<button type="submit" id="emit">GERAR LICENÇA PARA ESTE APARELHO</button>
+</form>
+<p id="status" role="status"></p>
+<div id="result" hidden>
+<h2>Licença criada</h2>
+<div id="licenseOut"></div>
+<button type="button" id="copy">COPIAR LICENÇA</button>
+<p>Envie somente esta chave e o ZIP do cliente ao comprador. A chave é válida apenas para o código do aparelho informado.</p>
+</div>
+<p id="error" role="alert"></p>
+</div>
+<p><small>Segurança: a senha de administrador não é salva neste navegador. Não envie esta senha, tokens nem arquivos do dono aos compradores. Licenças manuais estão vinculadas ao aparelho e não têm revogação individual automática.</small></p>
+<p><a href="/app/">Abrir painel do cliente</a></p>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  $("error").textContent="";
+  $("result").hidden=true;
+  $("status").textContent="Gerando licença...";
+  const machine=$("machine").value.trim().toUpperCase();
+  if(!/^[A-F0-9]{20}$/.test(machine)){ $("error").textContent="Código do aparelho inválido."; $("status").textContent=""; return; }
+  $("emit").disabled=true;
+  try{
+    const response=await fetch("/api/admin/license",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-PalcoLive-Admin":$("admin").value},
+      body:JSON.stringify({machine_code:machine,days:Number($("days").value),label:$("label").value.trim()})
+    });
+    const data=await response.json().catch(()=>({ok:false,error:"Resposta inválida do servidor."}));
+    if(!response.ok||!data.ok) throw Error(data.error||"Não foi possível gerar a licença.");
+    $("licenseOut").textContent=data.license_key;
+    $("result").hidden=false;
+    $("status").textContent="Licença gerada. Guarde o registro do pagamento e da data de vencimento.";
+  }catch(err){
+    $("status").textContent="";
+    $("error").textContent=err.message||"Erro inesperado.";
+  }finally{$("emit").disabled=false;}
+});
+$("copy").addEventListener("click",async()=>{
+ const key=$("licenseOut").textContent;
+ try{await navigator.clipboard.writeText(key);$("status").textContent="Licença copiada."}
+ catch{$("status").textContent="Selecione a licença exibida e copie manualmente.";}
+});
+</script>
+</body>
+</html>
