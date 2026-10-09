@@ -83,7 +83,14 @@ async function config(){
   try{
     const r=await fetch("/api/config",{cache:"no-store"}); const d=await r.json();
     setStatus("stServer","online","ok");
-    if(!d.tiktokReady) msg("Servidor online. Falta apenas configurar a conexão TikTok.","warn");
+    if(!d.tiktokReady) msg("Servidor online. Falta configurar o provedor TikTok.","warn");
+    const autoButton=$("kiwifyActivateBtn");
+    if(autoButton){
+      autoButton.disabled=!d.kiwifyAutomaticReady;
+      $("kiwifySetupStatus").textContent=d.kiwifyAutomaticReady
+        ? "Pagamento aprovado? Informe o pedido e o e-mail da compra para liberar automaticamente."
+        : "A ativação automática ainda não foi configurada pelo vendedor.";
+    }
     return d;
   }catch{setStatus("stServer","offline","bad");return null}
 }
@@ -284,6 +291,25 @@ async function boot(){
   pollTimer=setInterval(()=>{if(session)updateLiveStatus().catch(()=>{})},5000);
   if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
+$("kiwifyActivateBtn").addEventListener("click",async()=>{
+  const order=$("kiwifyOrder").value.trim();
+  const email=$("kiwifyEmail").value.trim();
+  if(!order || !email){msg("Digite a referência do pedido e o e-mail da compra.","warn");return;}
+  const button=$("kiwifyActivateBtn");
+  button.disabled=true;button.textContent="CONFIRMANDO PAGAMENTO...";
+  msg("Conferindo sua compra no sistema...");
+  try{
+    const d=await api("/api/kiwify/claim",{
+      order,email,machine_code:machineCode()
+    });
+    if(!d.ok || !d.device_credential)throw new Error(d.error || "Compra não confirmada.");
+    localStorage.setItem(STORAGE.credential,d.device_credential);
+    session=d;
+    applyMainState(true);
+    msg("Compra confirmada! Acesso liberado automaticamente neste aparelho.","ok");
+  }catch(e){msg(e.message||"Falha na ativação automática.","error");}
+  finally{button.disabled=false;button.textContent="ATIVAR MINHA COMPRA AUTOMATICAMENTE";}
+});
 $("deviceCode").textContent=machineCode();
 $("copyDeviceBtn").addEventListener("click",async()=>{
   const code=machineCode();
