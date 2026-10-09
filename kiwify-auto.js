@@ -15,7 +15,8 @@ module.exports = function createKiwifyAuto({
   const product = String(process.env.KIWIFY_PRODUCT_ID || "").trim();
   const token = String(process.env.KIWIFY_WEBHOOK_TOKEN || "");
   const databaseUrl = String(process.env.DATABASE_URL || "");
-  const configured = enabled && product.length >= 8 && token.length >= 24 && !!databaseUrl;
+  const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
+    && product.length >= 8 && token.length >= 24 && !!databaseUrl;
   const pool = configured ? new Pool({
     connectionString: databaseUrl,
     max: 5,
