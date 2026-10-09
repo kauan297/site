@@ -16,7 +16,7 @@ app.use(express.json({ limit: "12kb", strict: true }));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "10");
+  res.setHeader("X-PalcoLive-Version", "11");
   next();
 });
 
@@ -125,6 +125,19 @@ function decryptDeviceCredential(value, machineCode) {
 
 function sidForLicense(licenseKey) {
   return stableRoomId("license:" + String(licenseKey || "").trim());
+}
+
+function roomIdForClient(licenseKey, auth, machineCode) {
+  const mode = String(auth?.mode || "").toLowerCase();
+
+  // No modo de teste/desenvolvimento, cada aparelho recebe uma sala própria.
+  // Assim várias pessoas podem usar a mesma chave de teste sem misturar eventos.
+  if (mode === "test" || mode === "off") {
+    return stableRoomId("device:" + hashDevice(machineCode));
+  }
+
+  // No modo comercial, uma licença = uma sala isolada do cliente.
+  return sidForLicense(licenseKey);
 }
 
 function signPayload(payload) {
@@ -325,21 +338,10 @@ async function publishRoblox(topic, message) {
   }
 }
 
-const TEST_FALLBACK_TOPIC = "LunaDance_TESTE_FALLBACK";
-
 async function publishRobloxSession(topic, message) {
+  // Sempre publica somente na sala exclusiva da sessão.
+  // Não existe mais tópico global compartilhado entre clientes.
   await publishRoblox(topic, message);
-
-  // Enquanto LICENSE_MODE=test, envia também por um tópico de segurança.
-  // Isso evita perder comentários caso o launchData/servidor reservado do Roblox
-  // não tenha conectado à sala dinâmica. Em modo comercial este fallback NÃO roda.
-  if (LICENSE_MODE === "test" && topic !== TEST_FALLBACK_TOPIC) {
-    try {
-      await publishRoblox(TEST_FALLBACK_TOPIC, message);
-    } catch (error) {
-      console.error("[ROBLOX TEST FALLBACK]", error?.status || "internal");
-    }
-  }
 }
 
 app.get("/app", (req, res) => res.redirect(302, "/app/"));
@@ -350,15 +352,15 @@ app.use("/app", express.static(path.join(__dirname, "public"), {
 }));
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 10, app: "/app/" });
+  res.json({ name: "PalcoLive Server", ok: true, version: 11, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 10 });
+  res.json({ ok: true, version: 11 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 10, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY) });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 11, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -384,7 +386,7 @@ app.post("/api/activate", async (req, res) => {
 
     if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
 
-    const sid = sidForLicense(licenseKey);
+    const sid = roomIdForClient(licenseKey, auth, machineCode);
     const session = createSessionToken(sid, auth, machineCode);
     const deviceCredential = encryptDeviceCredential({
       licenseKey,
@@ -430,7 +432,7 @@ app.post("/api/login", async (req, res) => {
 
     if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
 
-    const sid = sidForLicense(licenseKey);
+    const sid = roomIdForClient(licenseKey, auth, machineCode);
     const session = createSessionToken(sid, auth, machineCode);
 
     return res.json({
@@ -478,7 +480,7 @@ app.post("/api/login-device", async (req, res) => {
 
     if (!auth.ok) return res.status(403).json({ ok: false, error: auth.error });
 
-    const sid = sidForLicense(licenseKey);
+    const sid = roomIdForClient(licenseKey, auth, machineCode);
     const session = createSessionToken(sid, auth, machineCode);
 
     return res.json({
@@ -662,7 +664,7 @@ if (LICENSE_MODE === "test" && !TEST_LICENSE_KEY) {
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v10 online na porta " + PORT);
+  console.log("PalcoLive Server v11 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
