@@ -35,6 +35,10 @@ function setStatus(id,text,kind=""){
 function isMobile(){
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia("(max-width: 680px)").matches;
 }
+function robloxUrl(s){
+  if(!s?.place_id||!s?.room_id) return "";
+  return "https://www.roblox.com/games/start?placeId="+encodeURIComponent(s.place_id)+"&launchData="+encodeURIComponent(s.room_id);
+}
 function applyMobileFlow(mode){
   mobileMode=mode||"";
   if(mobileMode) localStorage.setItem("palcolive_mobile_mode",mobileMode);
@@ -46,7 +50,7 @@ function applyMobileFlow(mode){
     : "Primeiro inicie a LIVE no TikTok com jogo/tela. Depois volte aqui: configure, conecte a LIVE e abra o Roblox.";
 
   const parent=$("mainCard");
-  const setup=$("setupBtn"), live=$("liveBtn"), roblox=$("openRobloxBtn");
+  const setup=$("setupBtn"), live=$("liveBtn"), roblox=$("openRobloxBtn"), share=$("shareRobloxBtn");
 
   if(mobileMode==="two"){
     setup.querySelector("span").textContent="1";
@@ -54,7 +58,7 @@ function applyMobileFlow(mode){
     roblox.querySelector("span").textContent="3";
     setup.querySelector("b").textContent="CONFIGURAÇÃO INICIAL";
     live.querySelector("small").textContent="deixe comentários e presentes conectados";
-    roblox.querySelector("small").textContent="use no celular que vai transmitir o jogo";
+    roblox.querySelector("small").textContent="abre neste celular; para outro aparelho use ENVIAR PALCO";
   }else{
     setup.querySelector("span").textContent="1";
     live.querySelector("span").textContent="2";
@@ -65,6 +69,7 @@ function applyMobileFlow(mode){
   parent.insertBefore(setup,parent.querySelector(".split"));
   parent.insertBefore(live,parent.querySelector(".split"));
   parent.insertBefore(roblox,parent.querySelector(".split"));
+  parent.insertBefore(share,parent.querySelector(".split"));
 }
 async function api(path,body={},token=""){
   const headers={"Content-Type":"application/json","X-PalcoLive-Device":machineCode()};
@@ -111,7 +116,7 @@ $("activateBtn").addEventListener("click",async()=>{
     if(!d.device_credential) throw new Error("Servidor não retornou a credencial segura.");
     localStorage.setItem(STORAGE.credential,d.device_credential);
     session=d;$("licenseInput").value="";
-    applyMainState(true);msg("Ativado. Faça a configuração inicial.","ok");
+    applyMainState(true);msg("Ativado. Este aparelho recebeu uma sala exclusiva. Faça a configuração inicial.","ok");
   }catch(e){msg(e.message,"error")}
   finally{$("activateBtn").disabled=false;$("activateBtn").textContent="ATIVAR"}
 });
@@ -148,7 +153,7 @@ $("onePhoneBtn").addEventListener("click",()=>{
 });
 $("twoPhoneBtn").addEventListener("click",()=>{
   applyMobileFlow("two");
-  msg("Modo 2 celulares selecionado. Deixe este celular como painel e use o outro para Roblox + transmissão.","ok");
+  msg("Modo 2 celulares selecionado. Conecte a LIVE neste painel e use ENVIAR PALCO para abrir a mesma sala no outro celular.","ok");
 });
 $("openRobloxBtn").addEventListener("click",async()=>{
   const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente neste aparelho.","warn");return}
@@ -159,7 +164,32 @@ $("openRobloxBtn").addEventListener("click",async()=>{
     if(!go) return;
   }
   msg("Abrindo o Roblox. No celular, aceite abrir o app Roblox.");
-  window.location.href="https://www.roblox.com/games/start?placeId="+encodeURIComponent(place)+"&launchData="+encodeURIComponent(room);
+  window.location.href=robloxUrl(s);
+});
+$("shareRobloxBtn").addEventListener("click",async()=>{
+  const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente neste aparelho.","warn");return}
+  const url=robloxUrl(s);
+  if(!url){msg("Servidor não retornou a sala do Roblox.","error");return}
+
+  try{
+    if(navigator.share){
+      await navigator.share({
+        title:"PalcoLive — abrir palco",
+        text:"Abra este link no celular que vai rodar o Roblox.",
+        url
+      });
+      msg("Link do palco enviado. O outro celular entra na MESMA sala exclusiva.","ok");
+      return;
+    }
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(url);
+      msg("Link do palco copiado. Envie para o outro celular e abra por lá.","ok");
+      return;
+    }
+    window.prompt("Copie este link e abra no outro celular:",url);
+  }catch(e){
+    if(e?.name!=="AbortError") msg("Não consegui compartilhar. Tente copiar o link novamente.","error");
+  }
 });
 async function updateLiveStatus(){
   const s=await ensureSession(); if(!s)return;
