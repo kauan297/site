@@ -371,7 +371,7 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
   }
 
   // Chave do dono para testes internos.
-  if (["test", "manual", "hybrid"].includes(LICENSE_MODE) && TEST_LICENSE_KEY && secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
+  if (LICENSE_MODE === "test" && TEST_LICENSE_KEY && secureEqualText(licenseKey, TEST_LICENSE_KEY)) {
     return {
       ok: true,
       mode: "test",
