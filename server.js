@@ -3,6 +3,7 @@ const helmet = require("helmet");
 const crypto = require("crypto");
 const path = require("path");
 const createTikTokDirect = require("./tiktok-direct");
+const createKiwifyAuto = require("./kiwify-auto");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -12,11 +13,15 @@ app.use(
     crossOriginResourcePolicy: false
   })
 );
-app.use(express.json({ limit: "12kb", strict: true }));
+app.use(express.json({
+  limit: "12kb",
+  strict: true,
+  verify(req, res, buffer) { req.rawBody = buffer.toString("utf8"); }
+}));
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "13");
+  res.setHeader("X-PalcoLive-Version", "14");
   next();
 });
 
@@ -361,6 +366,9 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
   if (!validMachineCode(machineCode)) {
     return { ok: false, error: "Dispositivo inválido." };
   }
+  if (typeof licenseKey === "string" && licenseKey.startsWith("KWF1.")) {
+    return kiwifyAuto.authorizeLicense(licenseKey, machineCode);
+  }
 
   if (LICENSE_MODE === "off") {
     return {
@@ -438,6 +446,23 @@ async function publishRobloxSession(topic, message) {
   await publishRoblox(topic, message);
 }
 
+// Rotas de compra automática, ativação pelo próprio comprador e bloqueio pós-reembolso.
+// Sem env Kiwify + banco de dados, todas as novas rotas ficam desativadas.
+const kiwifyAuto = createKiwifyAuto({
+  app,
+  sessionSecret: SESSION_SECRET,
+  hashDevice,
+  validMachineCode,
+  sidForLicense,
+  createSessionToken,
+  encryptDeviceCredential,
+  getSession,
+  limited,
+  stopLive: async (sid) => {
+    if (typeof tiktokDirect !== "undefined") await tiktokDirect.stop(sid);
+  }
+});
+
 app.get("/admin", (req, res) => res.redirect(302, "/app/admin.html"));
 
 app.post("/api/admin/license", (req, res) => {
@@ -488,15 +513,15 @@ app.use("/app", express.static(path.join(__dirname, "public"), {
 }));
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 13, app: "/app/" });
+  res.json({ name: "PalcoLive Server", ok: true, version: 14, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 13 });
+  res.json({ ok: true, version: 14 });
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 13, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled() });
+  res.json({ placeId: ROBLOX_PLACE_ID, version: 14, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled(), kiwifyAutomaticReady: kiwifyAuto.configured });
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -649,6 +674,14 @@ app.post("/api/deactivate-device", async (req, res) => {
 
     const licenseKey = stored.licenseKey.trim();
     const instanceId = stored.instanceId || null;
+
+    if (licenseKey.startsWith("KWF1.")) {
+      const released = await kiwifyAuto.releaseDevice(licenseKey, machineCode);
+      if (!released.ok) {
+        return res.status(409).json({ ok: false, error: "Não foi possível liberar este aparelho." });
+      }
+      return res.json({ ok: true, deactivated: true });
+    }
 
     if (LICENSE_MODE === "lemonsqueezy" || LICENSE_MODE === "hybrid") {
       try {
@@ -871,7 +904,7 @@ if (!["test", "manual", "hybrid", "lemonsqueezy", "off"].includes(LICENSE_MODE))
 }
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("PalcoLive Server v13 online na porta " + PORT);
+  console.log("PalcoLive Server v14 online na porta " + PORT);
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
