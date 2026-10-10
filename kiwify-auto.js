@@ -15,9 +15,10 @@ module.exports = function createKiwifyAuto({
   const product = String(process.env.KIWIFY_PRODUCT_ID || "").trim();
   const token = String(process.env.KIWIFY_WEBHOOK_TOKEN || "");
   const databaseUrl = String(process.env.DATABASE_URL || "");
-  // Uma compra única libera uma licença por tempo definido; 0 = vitalícia somente
-  // se o vendedor configurar isso de propósito. Padrão seguro: 30 dias.
-  const configuredDays = Number(process.env.KIWIFY_LICENSE_DAYS ?? 30);
+  // Exigir prazo explícito evita vender acesso permanente com padrão de 30 dias.
+  // 0 = sem vencimento; configuração ausente/inválida mantém a integração fechada.
+  const rawDays = String(process.env.KIWIFY_LICENSE_DAYS ?? "").trim();
+  const configuredDays = /^\d+$/.test(rawDays) ? Number(rawDays) : NaN;
   const licenseDays = Number.isInteger(configuredDays) && configuredDays >= 0 && configuredDays <= 3650
     ? configuredDays : NaN;
   const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
@@ -269,3 +270,4 @@ module.exports = function createKiwifyAuto({
 
   return { configured, authorizeLicense, releaseDevice };
 };
+
