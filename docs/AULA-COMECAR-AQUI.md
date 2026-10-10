@@ -4,6 +4,8 @@
 
 O PalcoLive conecta sua TikTok LIVE a um palco no Roblox. Os espectadores podem comentar nomes de usuário para aparecer no mapa, e presentes configurados podem ativar efeitos visuais.
 
+Consulte também o **guia online com todos os passos:** https://lunadance-server.onrender.com/app/guia.html
+
 ## Ative sua compra
 
 1. Aguarde o pagamento aparecer como **aprovado** na Kiwify.
