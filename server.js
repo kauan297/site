@@ -510,6 +510,7 @@ app.get("/app", (req, res, next) => {
   return res.redirect(302, "/app/");
 });
 app.get("/vendas", (req, res) => res.sendFile(path.join(__dirname, "public", "vendas.html")));
+app.get("/vendas", (req, res) => res.sendFile(path.join(__dirname, "public", "vendas.html")));
 app.get("/termos", (req, res) => res.redirect(302, "/app/termos.html"));
 app.get("/privacidade", (req, res) => res.redirect(302, "/app/privacidade.html"));
 app.use("/app", express.static(path.join(__dirname, "public"), {
