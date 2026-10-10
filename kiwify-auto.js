@@ -14,6 +14,10 @@ module.exports = function createKiwifyAuto({
   const enabled = String(process.env.KIWIFY_AUTO_ENABLED || "") === "1";
   const product = String(process.env.KIWIFY_PRODUCT_ID || "").trim();
   const token = String(process.env.KIWIFY_WEBHOOK_TOKEN || "");
+  // A Kiwify gera automaticamente o token; seu comprimento pode ser inferior
+  // a 24 caracteres. A segurança do webhook depende da assinatura HMAC-SHA1
+  // válida (não do comprimento arbitrário do token).
+  const webhookTokenValid = token.length >= 8 && token.length <= 512 && token === token.trim();
   const databaseUrl = String(process.env.DATABASE_URL || "");
   // Uma compra única libera uma licença por tempo definido; 0 = vitalícia somente
   // se o vendedor configurar isso de propósito. Padrão seguro: 30 dias.
@@ -21,7 +25,7 @@ module.exports = function createKiwifyAuto({
   const licenseDays = Number.isInteger(configuredDays) && configuredDays >= 0 && configuredDays <= 3650
     ? configuredDays : NaN;
   const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
-    && product.length >= 8 && token.length >= 24 && !!databaseUrl
+    && product.length >= 8 && webhookTokenValid && !!databaseUrl
     && Number.isFinite(licenseDays);
   const pool = configured ? new Pool({
     connectionString: databaseUrl,
@@ -119,7 +123,7 @@ module.exports = function createKiwifyAuto({
     // Kiwify (webhooks da plataforma de cursos) usa ?signature= com HMAC-SHA1
     // do JSON enviado e o token secreto configurado no painel da Kiwify.
     const signature = String(req.query?.signature || "").toLowerCase();
-    if (!/^[a-f0-9]{40}$/.test(signature) || token.length < 24) return false;
+    if (!/^[a-f0-9]{40}$/.test(signature) || !webhookTokenValid) return false;
     const body = JSON.stringify(req.body || {});
     const variants = [body];
     if (typeof req.rawBody === "string") variants.push(req.rawBody);

@@ -50,7 +50,7 @@ Variáveis de ambiente obrigatórias:
 | `KIWIFY_PRODUCT_ID` | `40cf8850-c44b-11f1-8fdf-3f2670dd515f` (já configurada) |
 | `KIWIFY_LICENSE_DAYS` | `0` (já configurada) |
 | `DATABASE_URL` | URL **interna** de banco PostgreSQL durável (não enviar por chat) |
-| `KIWIFY_WEBHOOK_TOKEN` | Token secreto do webhook Kiwify com pelo menos 24 caracteres. Não enviar por chat. |
+| `KIWIFY_WEBHOOK_TOKEN` | Token gerado automaticamente pela Kiwify (aceito com 8 a 512 caracteres, sem espaços nas extremidades). Configurar **somente no Render** e não compartilhar no chat. Se o token já apareceu em print, faça a rotação antes de vender. |
 | `LICENSE_MODE` | `manual` (requer `ADMIN_SECRET` com pelo menos 16 caracteres; preservar outras variáveis existentes) |
 | `KIWIFY_AUTO_ENABLED` | `1` **apenas quando o restante estiver pronto para teste** |
 

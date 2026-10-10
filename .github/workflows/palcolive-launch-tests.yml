@@ -27,6 +27,7 @@ jobs:
         run: |
           node tests/sales-gate.test.cjs
           node tests/sales-frontend.test.cjs
+          node tests/kiwify-short-token.test.cjs
       - name: Test Kiwify activation and refunds
         run: node tests/kiwify-auto.test.cjs
       - name: Test Roblox and mobile recovery panel
