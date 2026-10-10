@@ -11,7 +11,8 @@
   <meta property="og:url" content="https://lunadance-server.onrender.com/vendas">
   <title>PalcoLive — TikTok LIVE + Roblox | PC e Celular</title>
   <link rel="icon" href="/app/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/app/vendas.css">
+  <link rel="stylesheet" href="/app/vendas.css?v=2">
+  <link rel="canonical" href="https://lunadance-server.onrender.com/vendas">
 </head>
 <body>
   <div class="glow glow-left" aria-hidden="true"></div>
@@ -23,6 +24,7 @@
         <span>PALCO<span class="brand-accent">LIVE</span></span>
       </a>
       <nav class="header-links" aria-label="Menu">
+        <a href="#demonstracao">Demonstração</a>
         <a href="#como-funciona">Como funciona</a>
         <a href="#recursos">Recursos</a>
         <a href="#duvidas">Dúvidas</a>
@@ -38,12 +40,12 @@
 
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="dash" aria-hidden="true"></span> INTERATIVIDADE PARA CRIADORES DE LIVE</div>
-          <h1 id="hero-title">Sua LIVE.<br><span class="gradient-text">Seu palco.</span><br>Seu público no jogo.</h1>
-          <p class="hero-description">Transforme comentários da sua TikTok LIVE em personagens no <strong>Roblox</strong>. Seus espectadores escrevem o nick, aparecem no palco e ativam efeitos quando enviam presentes selecionados.</p>
+          <div class="eyebrow"><span class="dash" aria-hidden="true"></span> PARA QUEM FAZ LIVE DE ROBLOX</div>
+          <h1 id="hero-title">Seu público <span class="gradient-text">entra no jogo.</span><br> Sua LIVE vira um espetáculo.</h1>
+          <p class="hero-description">Dê vida à sua transmissão: quem comenta o nick aparece no <strong>palco Roblox</strong>. Quem manda presentes ativa efeitos especiais. Tudo controlado pelo PalcoLive — direto do PC ou celular.</p>
           <div class="hero-cta-row">
-            <a class="btn btn-primary" href="#como-funciona">Descubra como funciona <span aria-hidden="true">→</span></a>
-            <a class="btn btn-ghost" href="#acesso">Acesso permanente <span aria-hidden="true">↗</span></a>
+            <a class="btn btn-primary" href="#demonstracao">Testar a demonstração <span aria-hidden="true">↗</span></a>
+            <a class="btn btn-ghost" href="#acesso">Ver o acesso permanente <span aria-hidden="true">→</span></a>
           </div>
           <div class="hero-highlights">
             <span><i aria-hidden="true">✓</i> PC e celular</span>
@@ -55,26 +57,39 @@
           <div class="preview-window">
             <div class="window-topbar">
               <span class="window-dots" aria-hidden="true"><b></b><b></b><b></b></span>
-              <span>PALCOLIVE / ROBLOX</span><span class="live-pill">● LIVE</span>
+              <span>PALCOLIVE / DEMONSTRAÇÃO</span><span class="live-pill">● DEMO</span>
             </div>
-            <div class="arena" aria-hidden="true">
+            <div class="arena" id="demoArena" aria-hidden="true">
               <div class="arena-stars"></div>
               <div class="arena-halo"></div>
               <div class="arena-back"></div>
               <div class="arena-floor"></div>
               <div class="avatar avatar-one"><span class="avatar-head"></span><span class="avatar-body"></span><span class="avatar-legs"></span><small>Player_01</small></div>
               <div class="avatar avatar-two"><span class="avatar-head"></span><span class="avatar-body"></span><span class="avatar-legs"></span><small>Knzz0102</small></div>
+              <div class="avatar avatar-three" id="demoAvatar"><span class="avatar-head"></span><span class="avatar-body"></span><span class="avatar-legs"></span><small>SeuViewer</small></div>
+              <span class="arena-effect" id="demoEffect">✦ GRANDE ✦</span>
               <div class="arena-caption">PREVISUALIZAÇÃO ILUSTRATIVA</div>
             </div>
-            <div class="activity-list">
-              <div class="activity"><div class="activity-icon comment-icon">#</div><div><strong>Comentário recebido</strong><span>Knzz0102 entrou no palco</span></div><span class="activity-status">✓</span></div>
-              <div class="activity"><div class="activity-icon gift-icon">✦</div><div><strong>Presente recebido</strong><span>Rose → efeito GRANDE</span></div><span class="activity-status">✓</span></div>
+            <div class="activity-list" aria-live="polite" aria-atomic="true">
+              <div class="activity"><div class="activity-icon comment-icon">#</div><div><strong id="demoActivityTitle">Exemplo de comentário</strong><span id="demoActivityText">Knzz0102 entrou no palco</span></div><span class="activity-status">✓</span></div>
+              <div class="activity"><div class="activity-icon gift-icon">✦</div><div><strong id="demoGiftTitle">Exemplo de presente</strong><span id="demoGiftText">Rose → efeito GRANDE</span></div><span class="activity-status">✓</span></div>
             </div>
           </div>
-          <div class="floating-label label-one"><span class="pulse"></span> TikTok conectado</div>
-          <div class="floating-label label-two">✦ Presente → Efeito</div>
+          <div class="demo-controls" id="demonstracao" aria-label="Demonstração interativa do PalcoLive">
+            <div class="demo-heading"><span>◉ INTERAJA COM A PRÉVIA</span><small>Simulação visual, sem conexão com uma LIVE real</small></div>
+            <div class="demo-actions">
+              <button type="button" class="demo-action demo-action-chat" data-demo="comment"><span aria-hidden="true">💬</span> Comentar nick</button>
+              <button type="button" class="demo-action demo-action-gift" data-demo="rose"><span aria-hidden="true">🌹</span> Enviar Rosa</button>
+              <button type="button" class="demo-action demo-action-reset" data-demo="reset"><span aria-hidden="true">↺</span> Resetar</button>
+            </div>
+            <div class="demo-status" id="demoStatus" role="status" aria-live="polite">Escolha uma ação acima para ver a interação acontecer.</div>
+          </div>
+          <div class="floating-label label-one"><span class="pulse"></span> Prévia interativa</div>
+          <div class="floating-label label-two">✦ Comentário → Avatar</div>
         </div>
       </section>
+
+      <div class="ticker" aria-label="Fluxo da interação"><div class="ticker-inner"><span>COMENTÁRIO <b>→</b> AVATAR NO ROBLOX</span><i>✦</i><span>PRESENTE <b>→</b> EFEITO NO PALCO</span><i>✦</i><span>PC <b>+</b> CELULAR</span></div></div>
 
       <section class="stats-strip" aria-label="Principais funções">
         <div><strong>TikTok LIVE</strong><span>Fonte dos comentários e presentes</span></div>
@@ -85,8 +100,8 @@
       <section class="section" id="como-funciona">
         <div class="section-intro">
           <span class="section-kicker">SIMPLES DE USAR</span>
-          <h2>Do comentário ao palco<br>em três passos.</h2>
-          <p>Configure sua LIVE, abra o mapa pelo painel e deixe o público participar.</p>
+          <h2>Tudo pronto para a <span class="gradient-text">interação.</span><br>Três passos para começar.</h2>
+          <p>Não precisa editar código na hora da transmissão. Você configura os presentes no painel, abre o palco e começa a receber as interações.</p>
         </div>
         <div class="steps">
           <article class="step-card"><div class="step-number">01</div><div class="step-symbol">⌁</div><h3>Conecte sua LIVE</h3><p>Informe o @ do TikTok no painel PalcoLive e conecte a transmissão pública.</p></article>
@@ -95,10 +110,12 @@
         </div>
       </section>
 
+      <section class="mini-showcase" aria-label="Informações sobre compatibilidade"><div class="showcase-icon" aria-hidden="true">▣</div><div><strong>Feito para sua rotina de criador.</strong><p>Use o painel no navegador do PC ou do celular. A transmissão de tela pelo TikTok depende dos recursos disponíveis na sua conta.</p></div><a href="#duvidas">Ver perguntas <span aria-hidden="true">↗</span></a></section>
+
       <section class="section features-section" id="recursos">
         <div class="section-intro">
           <span class="section-kicker">O QUE VOCÊ RECEBE</span>
-          <h2>Seu público não fica só assistindo.</h2>
+          <h2>Mais interação.<br><span class="gradient-text">Mais participação.</span></h2>
           <p>Uma experiência para tornar as transmissões mais participativas.</p>
         </div>
         <div class="features-grid">
@@ -113,19 +130,19 @@
         <div class="access-panel">
           <div class="access-copy">
             <span class="section-kicker">LICENÇA PLANEJADA</span>
-            <h2>Um pagamento.<br><span class="gradient-text">Sem mensalidade.</span></h2>
+            <h2>Uma compra.<br><span class="gradient-text">Acesso permanente.</span></h2>
             <p>A proposta é oferecer uma <strong>licença sem data de expiração</strong>, com compra única. O uso continua sujeito à disponibilidade do PalcoLive e das plataformas TikTok e Roblox.</p>
             <div class="access-tags"><span>Pagamento único</span><span>PC e celular</span><span>Instruções de acesso</span></div>
           </div>
           <div class="checkout-card">
-            <div class="checkout-top">ACESSO PALCOLIVE</div>
+            <div class="checkout-top"><span class="checkout-pill">LICENÇA PLANEJADA</span> PALCOLIVE</div>
             <h3>Em preparação</h3>
             <p>O checkout pela Kiwify será disponibilizado depois da configuração e dos testes da ativação automática.</p>
             <div class="checkout-divider"></div>
             <div class="checkout-row"><span>Tipo de compra</span><strong>Pagamento único</strong></div>
             <div class="checkout-row"><span>Validade planejada</span><strong>Sem prazo definido</strong></div>
             <div class="checkout-row"><span>Valor</span><strong>A definir</strong></div>
-            <div class="disabled-cta" aria-label="Compras ainda não disponíveis">Compras em breve <span aria-hidden="true">↗</span></div>
+            <div class="disabled-cta" aria-label="Compras ainda não disponíveis"><span>Vendas em preparação</span><span aria-hidden="true">↗</span></div>
             <small>Nenhuma compra é processada nesta página.</small>
           </div>
         </div>
@@ -157,5 +174,6 @@
       <div class="legal">PalcoLive é independente e não é afiliado à TikTok nem à Roblox. As marcas pertencem a seus respectivos titulares. © 2026 PalcoLive.</div>
     </footer>
   </div>
+  <script src="/app/vendas.js?v=2" defer></script>
 </body>
 </html>
