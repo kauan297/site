@@ -301,7 +301,7 @@ async function openStage(recover=false){
   const url=robloxUrl(s);
   if(!url){msg("Servidor não retornou o mesmo palco.", "error");return;}
   if(isMobile() && mobileMode!=="two" && !liveConnected){
-    const go=confirm("O ideal é conectar a LIVE antes de abrir o Roblox.\\n\\nQuer abrir o Roblox mesmo assim?");
+    const go=confirm("O ideal é conectar a LIVE antes de abrir o Roblox.\n\nQuer abrir o Roblox mesmo assim?");
     if(!go) return;
   }
   markStageOpened();
