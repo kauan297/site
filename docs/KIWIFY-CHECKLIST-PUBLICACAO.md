@@ -13,13 +13,13 @@
 - `KIWIFY_AUTO_ENABLED=0` e `PUBLIC_SALES_ENABLED=0`: **não abrir vendas antes de completar os testes**.
 - A página `/vendas` já contém o botão de compra, mas só aparecerá quando a ativação Kiwify responder corretamente **e** `PUBLIC_SALES_ENABLED=1`.
 - Guia online do comprador: https://lunadance-server.onrender.com/app/guia.html
-- A área de membros da Kiwify ainda precisa ser preenchida pelo titular via painel.
+- Área de membros publicada: módulo Comece aqui e aula Ative seu PalcoLive; prévia de aluno conferida, liberação imediata e sem limite de duração. Ainda há aviso de lançamento em preparação.
 
 ## 1. Formas de pagamento e saques
 
-**Verificação Work em 10/10/2026:** o checkout direto abre com R$49,99, boleto, Pix e Apple Pay.
-O bloqueio do botão no site não desativa esse checkout. Desativar o checkout no painel durante a preparação;
-Apple Pay ainda precisa ser removido para cumprir a intenção de Pix/boleto. Nenhum pagamento de teste foi realizado.
+**Verificação Work em 10/10/2026:** R$49,99 conferidos no checkout real. Apple Pay foi desativado e salvo.
+Checkout `zNBj6FP` desabilitado no painel; link público confirma Produto não está mais disponível.
+Manter esse bloqueio e o bloqueio no site até validar banco, backup e compra/ativação/reembolso. Nenhum pagamento foi realizado.
 
 1. Kiwify > Produtos > PalcoLive > Configurações.
 2. Manter Cartão, Pix e Boleto no produto (a interface atual não permite retirar cartão globalmente).
@@ -39,7 +39,7 @@ Kiwify > Área de Membros > área do PalcoLive > Adicionar módulo > adicionar c
 - Módulo: **Comece aqui**
 - Aula: **Ative seu PalcoLive**
 - Conteúdo: copiar `docs/AULA-COMECAR-AQUI.md`.
-- Anexo: enviar `PalcoLive_Guia_de_Acesso_do_Cliente.pdf` fornecido separadamente.
+- Sem PDF anexado no momento; usar o guia online e não anunciar anexo inexistente.
 - Publicar a aula e conferir visualização como aluno.
 
 ## 3. Preparar backend no Render

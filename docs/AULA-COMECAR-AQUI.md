@@ -33,6 +33,6 @@ Use **REABRIR MESMO PALCO** no painel. O Roblox pode desconectar jogadores por i
 
 Sua licença é planejada como **compra única sem data de expiração** e permite ativação em um dispositivo por vez. O funcionamento depende da disponibilidade do PalcoLive e dos serviços TikTok/Roblox. Para trocar de aparelho, saia do painel no dispositivo antigo antes de ativar no novo.
 
-**Baixe também o Guia do Cliente (PDF)** anexado nesta aula para consultar todos os passos.
+**Consulte o guia online** informado no início desta aula para todos os passos.
 
 **Suporte:** utilize o canal de contato do vendedor informado na sua compra Kiwify. Nunca compartilhe sua senha.

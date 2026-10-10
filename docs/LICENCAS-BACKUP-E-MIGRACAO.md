@@ -67,9 +67,12 @@ O bloqueio do site não desativa o checkout direto da Kiwify. O titular precisa 
 
 ## Pendências reais
 
-- Acessar a Kiwify: o navegador do assistente está na tela de login, sem sessão autenticada.
-- Publicar e testar a aula, verificar checkout R$ 49,99 e ocultação do cartão.
+- Kiwify acessada: aula publicada e prévia conferida; webhook com produto/URL/eventos corretos.
+- Checkout R$49,99 conferido; Apple Pay desativado e checkout bloqueado no painel e link público. Manter vendas fechadas; testar entrega a comprador real.
 - Escolher/configurar banco durável e armazenamento privado dos backups.
 - Executar backup e restauração contra bancos reais autorizados, preservar segredos e testar credencial existente.
 - Validar evento real Kiwify e reembolso, inclusive reenvio após indisponibilidade.
 - Confirmar rotação do token exposto, suporte e instruções definitivas.
+
+Candidato gratuito estudado: Neon Free, com quotas e recuperação nativa limitada. Nenhum recurso criado ainda.
+Fonte oficial consultada em 10/10/2026: https://github.com/neondatabase/website/blob/main/content/faqs/free-plan-limits-and-quotas.md
