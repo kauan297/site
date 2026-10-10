@@ -21,7 +21,7 @@ Isso não é um teste do banco de produção nem um teste real de compra Kiwify.
 Executar num ambiente administrativo seguro com Node e dependências do projeto instaladas.
 Configurar as variáveis pelo gerenciador privado do ambiente; não copiar valores para chat, commits, prints ou comandos públicos.
 
-- `DATABASE_URL`: banco de origem para exportação; banco novo para restauração.
+- Conexão: `PALCOLIVE_BACKUP_DATABASE_URL` (destino/origem explícitos de uma operação administrativa), depois `KIWIFY_DATABASE_URL` (banco ativo das licenças), depois `DATABASE_URL` (compatibilidade). Configurar a variável correta para a operação; as URLs continuam privadas.
 - `SESSION_SECRET`: manter exatamente o segredo atual do Render.
 - `PALCOLIVE_BACKUP_KEY`: chave aleatória de 32 bytes codificada em 64 caracteres hexadecimais, guardada num gerenciador de senhas.
 - `PGSSLMODE=require`: quando o fornecedor exigir TLS; a validação do certificado permanece ativa.
@@ -57,7 +57,7 @@ reconciliar eventos Kiwify após incidente antes de liberar o serviço.
    ```
 
 5. Conferir contagens e estados, reembolso, prazo nulo e ativação com credencial existente no ambiente isolado.
-6. Atualizar somente DATABASE_URL e opções TLS no Render, preservando os demais segredos.
+6. Atualizar KIWIFY_DATABASE_URL e opções TLS no Render, preservando DATABASE_URL antiga e os demais segredos. O backend usa KIWIFY_DATABASE_URL quando definida, com DATABASE_URL como fallback.
 7. Habilitar a integração para teste, mantendo PUBLIC_SALES_ENABLED=0; reenviar eventos Kiwify que chegaram durante a janela e reconciliar pedidos.
 8. Validar compra/aparelho/reembolso reais; só depois publicar checkout e página de vendas.
 9. Conservar o banco antigo e a cópia até conferir todos os dados. Não apagar o banco antigo automaticamente.
@@ -74,5 +74,5 @@ O bloqueio do site não desativa o checkout direto da Kiwify. O titular precisa 
 - Validar evento real Kiwify e reembolso, inclusive reenvio após indisponibilidade.
 - Confirmar rotação do token exposto, suporte e instruções definitivas.
 
-Candidato gratuito estudado: Neon Free, com quotas e recuperação nativa limitada. Nenhum recurso criado ainda.
+Candidato gratuito preparado: projeto Neon `palcolive-licencas`, ID `raspy-meadow-62372613`, organização Kauan confirmada no plano free. Branch production `br-purple-firefly-b8plpt7t`, Postgres 18 em aws-us-east-1. Tabela criada sem pedidos e consultada com sucesso. Conexão privada preparada no Render em KIWIFY_DATABASE_URL, com TLS e sem apagar DATABASE_URL antiga. A integração permanece desativada; teste Render→Neon, backup externo/agendamento e compra real ainda pendentes.
 Fonte oficial consultada em 10/10/2026: https://github.com/neondatabase/website/blob/main/content/faqs/free-plan-limits-and-quotas.md

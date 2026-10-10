@@ -18,7 +18,8 @@ module.exports = function createKiwifyAuto({
   // a 24 caracteres. A segurança do webhook depende da assinatura HMAC-SHA1
   // válida (não do comprimento arbitrário do token).
   const webhookTokenValid = token.length >= 8 && token.length <= 512 && token === token.trim();
-  const databaseUrl = String(process.env.DATABASE_URL || "");
+  // Permite preparar a migração preservando a conexão do banco antigo no Render.
+  const databaseUrl = String(process.env.KIWIFY_DATABASE_URL || process.env.DATABASE_URL || "");
   // Uma compra única libera uma licença por tempo definido; 0 = vitalícia somente
   // se o vendedor configurar isso de propósito. Padrão seguro: 30 dias.
   const configuredDays = Number(process.env.KIWIFY_LICENSE_DAYS ?? 30);

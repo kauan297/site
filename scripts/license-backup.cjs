@@ -114,12 +114,13 @@ async function main() {
     console.log(`Backup autenticado: ${snapshot.orders.length} licenças. Restauração no banco ainda não executada.`);
     return;
   }
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL ausente.");
+  const connectionString = process.env.PALCOLIVE_BACKUP_DATABASE_URL || process.env.KIWIFY_DATABASE_URL || process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("Conexão de banco ausente.");
   if (operation === "restore" && (process.env.PUBLIC_SALES_ENABLED !== "0" || process.env.KIWIFY_AUTO_ENABLED !== "0")) {
     throw new Error("Desative vendas e webhooks durante a restauração.");
   }
   const { Client } = require("pg");
-  const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 15000,
+  const client = new Client({ connectionString, connectionTimeoutMillis: 15000,
     ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: true } : undefined });
   try {
     await client.connect();
