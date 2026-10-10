@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - palcolive-lancamento-preparo-20261010
+      - lunadance-server
+      - palcolive-backup-preparo-20261010
   pull_request:
     branches:
       - lunadance-server
@@ -30,5 +32,36 @@ jobs:
           node tests/kiwify-short-token.test.cjs
       - name: Test Kiwify activation and refunds
         run: node tests/kiwify-auto.test.cjs
+      - name: Test encrypted license backup and safe restore
+        run: node tests/license-backup.test.cjs
       - name: Test Roblox and mobile recovery panel
         run: node tests/stability.test.cjs
+
+  backup-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: palcolive_disposable_test
+          POSTGRES_USER: palcolive_test
+          POSTGRES_PASSWORD: disposable-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test backup and restore against disposable PostgreSQL
+        env:
+          PALCOLIVE_DISPOSABLE_DATABASE: '1'
+          TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
+        run: node tests/license-backup-postgres.test.cjs

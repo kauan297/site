@@ -9,6 +9,19 @@
 - Usuário prefere **uma tarefa pequena por vez** e quer que o assistente execute autonomamente tudo o que ferramentas conectadas permitirem; mostrar o mínimo de passos manuais.
 - Objetivo: lançar ainda em outubro, depois de verificar ativação, entrega e preservação das licenças. Não contratar plano ou ativar cobranças automaticamente sem autorização.
 
+## Revisão Work em 10/10/2026 — continuar daqui
+
+- Arquivo anexado e este resumo lidos completamente; repositório existente clonado, sem reiniciar o projeto.
+- Render confirma deploy `672de8ae51204751cdc22ed30063ffd50163dc6d` live e banco gratuito disponível, com expiração em 09/11/2026.
+- `/api/config` real retorna `commercialReady=false`, `kiwifyAutomaticReady=false`, `salesReady=false` e checkout vazio. Nada foi habilitado pelo assistente.
+- **Checkout direto da Kiwify abre um formulário de pagamento:** nome do produto correto, R$49,99, boleto/Pix e também **Apple Pay**. Ocultar cartão não retirou Apple Pay. Nenhuma compra foi realizada. Bloquear o site não bloqueia o checkout direto; conferir/desativar no painel antes de continuar a preparação.
+- Dashboard Kiwify redireciona a login; não há sessão autenticada neste navegador. Área de membros, eventos e bloqueio direto ainda não conferidos. Próxima etapa manual: autenticação segura na Kiwify, sem enviar senha no chat.
+- Consulta Postgres pelo conector foi recusada porque a lista de acesso externo está vazia. Nenhuma regra de rede foi enfraquecida. Isso não comprova falha da conexão interna do servidor.
+- Seis conjuntos de testes locais passaram (compra simulada, token curto, vendas/frontend, estabilidade e novo backup simulado).
+- PR #5: https://github.com/kauan297/site/pull/5 prepara backup privado criptografado AES-256-GCM e restauração transacional para destino vazio, preservando SESSION_SECRET, aparelhos, reembolsos e prazos. Também testa PostgreSQL 18 descartável no Actions e passa a testar pushes de produção. Consultar o estado do PR/Actions antes de presumir merge ou deploy.
+- Procedimento: `docs/LICENCAS-BACKUP-E-MIGRACAO.md`. **Backup real, agendamento, armazenamento privado e migração para banco durável ainda não executados.** Nenhum plano pago contratado; nenhum segredo exposto.
+- Não declarar o produto pronto: faltam banco durável, backup/restore reais, checkout bloqueado durante preparação, entrega Kiwify e compra/ativação/reembolso reais.
+
 ## Infraestrutura
 - GitHub: https://github.com/kauan297/site, **branch de produção: `lunadance-server`**.
 - Render Web Service: `lunadance-server`, ID `srv-db1qjg9srm7s73csh1f0`, workspace `tea-db17evou01pc73d6eu7g`.
