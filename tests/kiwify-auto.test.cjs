@@ -6,6 +6,7 @@ const rows=new Map(),handlers=new Map(),middleware=[],stopped=[];
 class Pool{
   async query(sql,p=[]){
     if(/^(CREATE TABLE|ALTER TABLE)/.test(sql))return{rowCount:0,rows:[]};
+    if(sql==="SELECT 1")return{rowCount:1,rows:[{value:1}]};
     if(sql.startsWith("INSERT INTO palcolive_kiwify_orders")){
       let [id,ref,product,email,state,expiration]=p,old=rows.get(id);
       if(old){old.state=old.state==="revoked"?"revoked":state;}
@@ -65,6 +66,7 @@ const data={order_id:orderId,order_ref:"Quzqwus",order_status:"paid",webhook_eve
 const webhook=(body,signature=sig(body))=>post("/api/kiwify/webhook",body,signature);
 const claim=(email,order,machine)=>post("/api/kiwify/claim",{email,order,machine_code:machine});
 (async()=>{
+  assert.equal(await auto.readyForClaims(),true,"o banco está disponível");
   assert.equal((await webhook(data,"wrong")).code,401,"recusar assinatura falsa");
   assert.equal((await claim("comprador@example.com","Quzqwus",A)).code,403,"recusar pedido inexistente");
   const other={...data,Product:{product_id:"00000000-0000-0000-0000-000000000000"}};
