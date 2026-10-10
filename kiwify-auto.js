@@ -251,6 +251,20 @@ module.exports = function createKiwifyAuto({
     return { ok: result.rowCount === 1 };
   }
 
+  // Antes de anunciar a ativação no painel, confirmar que o banco responde.
+  // Sem vazar URL, credenciais ou detalhes internos ao comprador.
+  async function readyForClaims() {
+    if (!configured) return false;
+    try {
+      await ready();
+      await pool.query("SELECT 1");
+      return true;
+    } catch (error) {
+      console.error("[KIWIFY READY]", error?.code || "storage");
+      return false;
+    }
+  }
+
   // Toda chamada autenticada revalida licenças Kiwify contra o banco.
   // Reembolsos e chargebacks bloqueiam tokens ainda dentro das 6h de validade.
   app.use("/api", async (req, res, next) => {
@@ -267,5 +281,5 @@ module.exports = function createKiwifyAuto({
     }
   });
 
-  return { configured, authorizeLicense, releaseDevice };
+  return { configured, authorizeLicense, releaseDevice, readyForClaims };
 };

@@ -1,0 +1,24 @@
+name: PalcoLive Kiwify purchase flow tests
+
+on:
+  push:
+    branches:
+      - palcolive-kiwify-preparacao-20261010
+  pull_request:
+    branches:
+      - lunadance-server
+
+jobs:
+  test-kiwify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check code syntax
+        run: |
+          node --check kiwify-auto.js
+          node --check tests/kiwify-auto.test.cjs
+      - name: Run webhook, license and refund tests
+        run: node tests/kiwify-auto.test.cjs

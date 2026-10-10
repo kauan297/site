@@ -527,8 +527,17 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, version: 14 });
 });
 
-app.get("/api/config", (req, res) => {
-  res.json({ placeId: ROBLOX_PLACE_ID, version: 14, mobileApp: "/app/", tiktokReady: Boolean(EULER_API_KEY), isolatedRooms: true, commercialReady: commercialModeEnabled(), kiwifyAutomaticReady: kiwifyAuto.configured });
+app.get("/api/config", async (req, res) => {
+  const kiwifyAutomaticReady = await kiwifyAuto.readyForClaims();
+  res.json({
+    placeId: ROBLOX_PLACE_ID,
+    version: 14,
+    mobileApp: "/app/",
+    tiktokReady: Boolean(EULER_API_KEY),
+    isolatedRooms: true,
+    commercialReady: commercialModeEnabled(),
+    kiwifyAutomaticReady
+  });
 });
 
 app.post("/api/activate", async (req, res) => {
