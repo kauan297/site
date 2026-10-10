@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const createTikTokDirect = require("./tiktok-direct");
 const createKiwifyAuto = require("./kiwify-auto");
+const { publicSalesState } = require("./sales-gate");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -510,7 +511,6 @@ app.get("/app", (req, res, next) => {
   return res.redirect(302, "/app/");
 });
 app.get("/vendas", (req, res) => res.sendFile(path.join(__dirname, "public", "vendas.html")));
-app.get("/vendas", (req, res) => res.sendFile(path.join(__dirname, "public", "vendas.html")));
 app.get("/termos", (req, res) => res.redirect(302, "/app/termos.html"));
 app.get("/privacidade", (req, res) => res.redirect(302, "/app/privacidade.html"));
 app.use("/app", express.static(path.join(__dirname, "public"), {
@@ -529,6 +529,12 @@ app.get("/health", (req, res) => {
 
 app.get("/api/config", async (req, res) => {
   const kiwifyAutomaticReady = await kiwifyAuto.readyForClaims();
+  const sales = publicSalesState({
+    enabled: process.env.PUBLIC_SALES_ENABLED === "1",
+    automaticReady: kiwifyAutomaticReady,
+    checkoutUrl: process.env.KIWIFY_CHECKOUT_URL,
+    checkoutCode: process.env.KIWIFY_CHECKOUT_CODE
+  });
   res.json({
     placeId: ROBLOX_PLACE_ID,
     version: 14,
@@ -536,7 +542,8 @@ app.get("/api/config", async (req, res) => {
     tiktokReady: Boolean(EULER_API_KEY),
     isolatedRooms: true,
     commercialReady: commercialModeEnabled(),
-    kiwifyAutomaticReady
+    kiwifyAutomaticReady,
+    ...sales
   });
 });
 
