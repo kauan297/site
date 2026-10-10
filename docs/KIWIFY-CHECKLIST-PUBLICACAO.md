@@ -17,6 +17,10 @@
 
 ## 1. Formas de pagamento e saques
 
+**Verificação Work em 10/10/2026:** o checkout direto abre com R$49,99, boleto, Pix e Apple Pay.
+O bloqueio do botão no site não desativa esse checkout. Desativar o checkout no painel durante a preparação;
+Apple Pay ainda precisa ser removido para cumprir a intenção de Pix/boleto. Nenhum pagamento de teste foi realizado.
+
 1. Kiwify > Produtos > PalcoLive > Configurações.
 2. Manter Cartão, Pix e Boleto no produto (a interface atual não permite retirar cartão globalmente).
 3. Desligar Apple Pay e alternativas de cartão para reduzir opções indesejadas.
@@ -55,6 +59,9 @@ Variáveis de ambiente obrigatórias:
 | `KIWIFY_AUTO_ENABLED` | `1` **apenas quando o restante estiver pronto para teste** |
 
 **Atenção:** o banco gratuito `palcolive-licencas-teste` expira em 9/11/2026. Não abrir vendas com dependência permanente desse banco sem migração/upgrade autorizados. Não executar cobrança de serviço pago sem autorização.
+
+Backup/restauração e preservação dos segredos: consultar `docs/LICENCAS-BACKUP-E-MIGRACAO.md`.
+A ferramenta preparada não significa que backup, agendamento ou migração real tenham sido executados.
 
 O painel só mostrará ativação automática pronta quando as variáveis estiverem completas **e** o banco responder.
 
