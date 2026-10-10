@@ -4,6 +4,17 @@
 **Estado:** em preparação; só divulgar após teste de compra, ativação e devolução.  
 **ID do produto da conta atual:** `40cf8850-c44b-11f1-8fdf-3f2670dd515f`.
 
+## O que já está preparado no servidor
+
+- ID do produto: `40cf8850-c44b-11f1-8fdf-3f2670dd515f`
+- Checkout específico: `https://pay.kiwify.com.br/zNBj6FP?hideCard=true` (Pix/boleto, ocultando o cartão somente nesse link).
+- `KIWIFY_CHECKOUT_CODE=zNBj6FP` e `KIWIFY_CHECKOUT_URL` já configurados no Render.
+- `KIWIFY_LICENSE_DAYS=0` significa licença sem data de expiração.
+- `KIWIFY_AUTO_ENABLED=0` e `PUBLIC_SALES_ENABLED=0`: **não abrir vendas antes de completar os testes**.
+- A página `/vendas` já contém o botão de compra, mas só aparecerá quando a ativação Kiwify responder corretamente **e** `PUBLIC_SALES_ENABLED=1`.
+- Guia online do comprador: https://lunadance-server.onrender.com/app/guia.html
+- A área de membros da Kiwify ainda precisa ser preenchida pelo titular via painel.
+
 ## 1. Formas de pagamento e saques
 
 1. Kiwify > Produtos > PalcoLive > Configurações.

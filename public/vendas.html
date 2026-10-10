@@ -33,9 +33,9 @@
     </header>
 
     <main>
-      <div class="notice" role="note">
+      <div class="notice" id="salesNoticeBanner" role="note">
         <span class="notice-dot" aria-hidden="true"></span>
-        <span><strong>Lançamento em preparação.</strong> As vendas ainda não estão liberadas; a ativação automática está em configuração.</span>
+        <span id="salesNoticeText"><strong>Lançamento em preparação.</strong> As vendas ainda não estão liberadas; a ativação automática está em configuração.</span>
       </div>
 
       <section class="hero" aria-labelledby="hero-title">
@@ -136,14 +136,15 @@
           </div>
           <div class="checkout-card">
             <div class="checkout-top"><span class="checkout-pill">LICENÇA PLANEJADA</span> PALCOLIVE</div>
-            <h3>Em preparação</h3>
-            <p>O checkout pela Kiwify será disponibilizado depois da configuração e dos testes da ativação automática.</p>
+            <h3 id="salesCheckoutHeading">Em preparação</h3>
+            <p id="salesCheckoutDescription">O checkout pela Kiwify será disponibilizado depois da configuração e dos testes da ativação automática.</p>
             <div class="checkout-divider"></div>
             <div class="checkout-row"><span>Tipo de compra</span><strong>Pagamento único</strong></div>
             <div class="checkout-row"><span>Validade planejada</span><strong>Sem prazo definido</strong></div>
             <div class="checkout-row"><span>Valor</span><strong>R$ 49,99</strong></div>
-            <div class="disabled-cta" aria-label="Compras ainda não disponíveis"><span>Vendas em preparação</span><span aria-hidden="true">↗</span></div>
-            <small>Nenhuma compra é processada nesta página.</small>
+            <div id="salesCheckoutPending" class="disabled-cta" aria-label="Compras ainda não disponíveis"><span>Vendas em preparação</span><span aria-hidden="true">↗</span></div>
+            <a id="salesCheckoutButton" class="btn btn-primary" rel="noopener noreferrer" target="_blank" style="display:none;margin-top:22px;width:100%" href="#" aria-label="Comprar PalcoLive por R$ 49,99, pagamento via Pix ou boleto">COMPRAR POR R$ 49,99 <span aria-hidden="true">↗</span></a>
+            <small id="salesCheckoutFootnote">Nenhuma compra é processada nesta página.</small>
           </div>
         </div>
       </section>
@@ -174,6 +175,6 @@
       <div class="legal">PalcoLive é independente e não é afiliado à TikTok nem à Roblox. As marcas pertencem a seus respectivos titulares. © 2026 PalcoLive.</div>
     </footer>
   </div>
-  <script src="/app/vendas.js?v=2" defer></script>
+  <script src="/app/vendas.js?v=3" defer></script>
 </body>
 </html>
