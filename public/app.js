@@ -11,6 +11,39 @@ let pollTimer = null;
 let mobileMode = localStorage.getItem("palcolive_mobile_mode") || "";
 let liveWanted = localStorage.getItem("palcolive_live_wanted") === "1";
 let autoRecovering = false;
+let statusPolling = false;
+let renewSessionPromise = null;
+let nextAutoRecoverAt = 0;
+const STAGE_OPENED_KEY = "palcolive_stage_opened_at_v1";
+let stageOpenedAt = Number(localStorage.getItem(STAGE_OPENED_KEY)) || 0;
+
+// O navegador não consegue verificar a conexão do aplicativo Roblox.
+// O relógio abaixo é apenas um lembrete baseado na última abertura pelo painel.
+function refreshStageNotice(){
+  const status = $("stageNotice");
+  if(!status) return;
+  if(!Number.isFinite(stageOpenedAt) || stageOpenedAt <= 0 || stageOpenedAt > Date.now()){
+    setStatus("stStage","não verificado","warn");
+    status.textContent="O PalcoLive ainda não registrou a abertura do Roblox neste aparelho. A conexão do jogo não pode ser verificada pelo navegador.";
+    return;
+  }
+  const minutes = Math.floor((Date.now()-stageOpenedAt)/60000);
+  if(minutes >= 20){
+    setStatus("stStage","verificar agora","warn");
+    status.textContent="O palco foi aberto há "+minutes+" min por este painel. Verifique o Roblox: após cerca de 20 min sem interação, a plataforma pode desconectar o jogador. Toque em REABRIR MESMO PALCO caso tenha caído.";
+  }else if(minutes >= 15){
+    setStatus("stStage","atenção à inatividade","warn");
+    status.textContent="O Roblox foi aberto há "+minutes+" min. Confira se continua na partida e interaja de verdade com seu público. O painel não consegue impedir a desconexão por inatividade.";
+  }else{
+    setStatus("stStage","aberto há "+minutes+" min","");
+    status.textContent="Última abertura do Roblox neste aparelho há "+minutes+" min. O painel acompanha o TikTok, mas não recebe confirmação direta de que o jogo continua conectado.";
+  }
+}
+function markStageOpened(){
+  stageOpenedAt=Date.now();
+  localStorage.setItem(STAGE_OPENED_KEY,String(stageOpenedAt));
+  refreshStageNotice();
+}
 
 function machineCode(){
   let v=localStorage.getItem(STORAGE.machine);
@@ -125,6 +158,7 @@ async function api(path,body={},token=""){
   const r=await fetch(path,{method:"POST",headers,body:JSON.stringify(body)});
   const data=await r.json().catch(()=>({ok:false,error:"Resposta inválida do servidor."}));
   if(!r.ok && !data.error) data.error="HTTP "+r.status;
+  data._httpStatus=r.status;
   return data;
 }
 async function config(){
@@ -145,17 +179,34 @@ async function config(){
 async function login(){
   const credential=localStorage.getItem(STORAGE.credential);
   if(!credential) return null;
-  const d=await api("/api/login-device",{device_credential:credential,machine_code:machineCode()});
-  if(d.ok){session=d;setStatus("stLicense","ativa","ok");return d}
-  localStorage.removeItem(STORAGE.credential); session=null; return null;
+  try{
+    const d=await api("/api/login-device",{device_credential:credential,machine_code:machineCode()});
+    if(d.ok){session=d;setStatus("stLicense","ativa","ok");return d;}
+    // Falhas temporárias de rede/servidor não devem apagar a licença salva.
+    if([400,401,403].includes(d._httpStatus)){
+      localStorage.removeItem(STORAGE.credential);
+      session=null;
+    }
+  }catch{
+    setStatus("stServer","sem conexão","warn");
+  }
+  return null;
 }
 async function ensureSession(){
-  if(session?.session_token) return session;
-  return await login();
+  const expiry=Date.parse(session?.expires_at||"");
+  if(session?.session_token && Number.isFinite(expiry) && expiry>Date.now()+120000) return session;
+  if(!renewSessionPromise){
+    renewSessionPromise=login().finally(()=>{renewSessionPromise=null;});
+  }
+  const renewed=await renewSessionPromise;
+  if(renewed) return renewed;
+  if(session?.session_token && Number.isFinite(expiry) && expiry>Date.now()) return session;
+  return null;
 }
 function applyMainState(active){
   $("activationCard").classList.toggle("hidden",active);
   $("mainCard").classList.toggle("hidden",!active);
+  $("recoveryCard").classList.toggle("hidden",!active);
   if(active) setStatus("stLicense","ativa","ok"); else setStatus("stLicense","pendente","warn");
   const u=username();
   setStatus("stTikTok",u?"@"+u:"configurar",u?"":"warn");
@@ -244,16 +295,35 @@ $("twoPhoneBtn").addEventListener("click",()=>{
   applyMobileFlow("two");
   msg("Modo 2 celulares selecionado. Conecte a LIVE neste painel e use ENVIAR PALCO para abrir a mesma sala no outro celular.","ok");
 });
-$("openRobloxBtn").addEventListener("click",async()=>{
-  const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente neste aparelho.","warn");return}
-  const place=s.place_id, room=s.room_id;
-  if(!place||!room){msg("Servidor não retornou o palco.","error");return}
+async function openStage(recover=false){
+  const s=await ensureSession();
+  if(!s){applyMainState(false);msg("Não foi possível confirmar a licença. Volte ao painel e tente novamente.", "warn");return;}
+  const url=robloxUrl(s);
+  if(!url){msg("Servidor não retornou o mesmo palco.", "error");return;}
   if(isMobile() && mobileMode!=="two" && !liveConnected){
-    const go=confirm("No modo 1 celular, o ideal é CONECTAR A LIVE antes de abrir o Roblox.\n\nQuer abrir o Roblox mesmo assim?");
+    const go=confirm("O ideal é conectar a LIVE antes de abrir o Roblox.\n\nQuer abrir o Roblox mesmo assim?");
     if(!go) return;
   }
-  msg("Abrindo o Roblox. No celular, aceite abrir o app Roblox.");
-  window.location.href=robloxUrl(s);
+  markStageOpened();
+  msg(recover?"Reabrindo sua sala original no Roblox. A LIVE e os presentes não são reiniciados.":"Abrindo o palco Roblox. No celular, aceite abrir o app Roblox.","ok");
+  window.location.href=url;
+}
+$("openRobloxBtn").addEventListener("click",()=>openStage(false));
+$("resumeStageBtn").addEventListener("click",()=>openStage(true));
+$("copyStageBtn").addEventListener("click",async()=>{
+  const s=await ensureSession();
+  const url=robloxUrl(s);
+  if(!url){msg("Não consegui recuperar o link do palco. Confira sua licença e conexão.","warn");return;}
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(url);
+      msg("Link da mesma sala copiado! Abra no aparelho que vai transmitir o Roblox.","ok");
+    }else{
+      window.prompt("Copie o link da sua sala e abra no Roblox:",url);
+    }
+  }catch{
+    window.prompt("Copie o link da sua sala e abra no Roblox:",url);
+  }
 });
 $("shareRobloxBtn").addEventListener("click",async()=>{
   const s=await ensureSession(); if(!s){applyMainState(false);msg("Ative novamente neste aparelho.","warn");return}
@@ -281,33 +351,57 @@ $("shareRobloxBtn").addEventListener("click",async()=>{
   }
 });
 async function updateLiveStatus(){
-  const s=await ensureSession(); if(!s)return;
-  const d=await api("/api/tiktok/status",{},s.session_token);
-  liveConnected=!!d.connected;
-
-  if(liveConnected){
-    setStatus("stLive","ativa","ok");
-    $("liveBtnText").textContent="DESCONECTAR LIVE";
-    setStatus("stTikTok","conectado","ok");
-    return;
-  }
-
-  const status=String(d.status||"stopped");
-  setStatus("stLive",status==="reconnecting"?"reconectando":"parada",status==="reconnecting"?"warn":"");
-  $("liveBtnText").textContent=status==="reconnecting"?"RECONECTANDO...":"CONECTAR LIVE";
-
-  if(liveWanted && status==="stopped" && !autoRecovering && username()){
-    autoRecovering=true;
-    try{
-      const r=await api("/api/tiktok/start",{username:username(),gifts:gifts()},s.session_token);
-      if(r.ok){
-        liveConnected=true;
-        setStatus("stLive","ativa","ok");
-        setStatus("stTikTok","conectado","ok");
-        $("liveBtnText").textContent="DESCONECTAR LIVE";
-        msg("LIVE reconectada automaticamente.","ok");
-      }
-    }finally{autoRecovering=false}
+  if(statusPolling) return;
+  statusPolling=true;
+  try{
+    let s=await ensureSession();
+    if(!s){
+      setStatus("stLive","sessão pendente","warn");
+      return;
+    }
+    let d=await api("/api/tiktok/status",{},s.session_token);
+    if(d._httpStatus===401){
+      session=null;
+      s=await ensureSession();
+      if(!s){setStatus("stLive","sessão expirada","warn");return;}
+      d=await api("/api/tiktok/status",{},s.session_token);
+    }
+    if(!d.ok){
+      setStatus("stLive","não verificada","warn");
+      return;
+    }
+    setStatus("stServer","online","ok");
+    liveConnected=!!d.connected;
+    if(liveConnected){
+      setStatus("stLive","ativa","ok");
+      $("liveBtnText").textContent="DESCONECTAR LIVE";
+      setStatus("stTikTok","conectado","ok");
+      return;
+    }
+    const status=String(d.status||"stopped");
+    setStatus("stLive",status==="reconnecting"?"reconectando":"parada",status==="reconnecting"?"warn":"");
+    $("liveBtnText").textContent=status==="reconnecting"?"RECONECTANDO...":"CONECTAR LIVE";
+    if(liveWanted && status==="stopped" && !autoRecovering && username() && Date.now()>=nextAutoRecoverAt){
+      autoRecovering=true;
+      // Evita várias tentativas por minuto e bloqueio de taxa no servidor.
+      nextAutoRecoverAt=Date.now()+45000;
+      try{
+        const r=await api("/api/tiktok/start",{username:username(),gifts:gifts()},s.session_token);
+        if(r.ok){
+          liveConnected=true;
+          nextAutoRecoverAt=0;
+          setStatus("stLive","ativa","ok");
+          setStatus("stTikTok","conectado","ok");
+          $("liveBtnText").textContent="DESCONECTAR LIVE";
+          msg("Conexão com a LIVE restaurada. Confira se o Roblox continua aberto.","ok");
+        }
+      }finally{autoRecovering=false;}
+    }
+  }catch{
+    setStatus("stServer","sem resposta","warn");
+    setStatus("stLive","não verificada","warn");
+  }finally{
+    statusPolling=false;
   }
 }
 $("liveBtn").addEventListener("click",async()=>{
@@ -354,9 +448,13 @@ $("forgetBtn").addEventListener("click",async()=>{
   liveConnected=false;
   liveWanted=false;
   applyMainState(false);
+  stageOpenedAt=0;
+  localStorage.removeItem(STAGE_OPENED_KEY);
+  refreshStageNotice();
   msg("Este aparelho saiu do PalcoLive e a ativação foi liberada quando aplicável.","ok");
 });
 async function boot(){
+  refreshStageNotice();
   await config();
   const ok=await login();
   applyMainState(!!ok);
@@ -370,7 +468,15 @@ async function boot(){
       : "Pronto. Abra o palco e conecte sua LIVE.","ok");
     await updateLiveStatus()
   }
-  pollTimer=setInterval(()=>{if(session)updateLiveStatus().catch(()=>{})},5000);
+  pollTimer=setInterval(()=>{
+    refreshStageNotice();
+    if(localStorage.getItem(STORAGE.credential) && navigator.onLine!==false) updateLiveStatus().catch(()=>{});
+  },5000);
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden){refreshStageNotice();updateLiveStatus().catch(()=>{});}
+  });
+  window.addEventListener("online",()=>{config().catch(()=>{});updateLiveStatus().catch(()=>{});});
+  window.addEventListener("offline",()=>{setStatus("stServer","offline","warn");setStatus("stLive","não verificada","warn");});
   if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
 $("kiwifyActivateBtn").addEventListener("click",async()=>{

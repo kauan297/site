@@ -13,3 +13,9 @@ dialog{width:min(680px,calc(100% - 24px));max-height:90dvh;overflow-y:auto;backg
 .giftCustom{display:block;margin-top:8px}
 .giftCustom.hidden{display:none!important}
 .giftHelp,.giftFootnote{font-size:13px;color:var(--muted);line-height:1.5;margin:12px 0 4px}
+
+.recoveryCard h2{margin-bottom:8px}
+.recoveryNotice{padding:12px;border-radius:10px;background:rgba(255,255,255,.04);line-height:1.55}
+.recoveryActions{margin:12px 0;gap:10px}
+.recoveryActions button{min-height:48px}
+.recoveryFootnote{font-size:12px;line-height:1.5;color:var(--muted)}
