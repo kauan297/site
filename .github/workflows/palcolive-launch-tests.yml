@@ -30,6 +30,7 @@ jobs:
           node tests/sales-gate.test.cjs
           node tests/sales-frontend.test.cjs
           node tests/kiwify-short-token.test.cjs
+          node tests/kiwify-storage-preflight.test.cjs
       - name: Test Kiwify activation and refunds
         run: node tests/kiwify-auto.test.cjs
       - name: Test encrypted license backup and safe restore

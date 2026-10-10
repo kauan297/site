@@ -28,7 +28,9 @@ module.exports = function createKiwifyAuto({
   const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
     && product.length >= 8 && webhookTokenValid && !!databaseUrl
     && Number.isFinite(licenseDays);
-  const pool = configured ? new Pool({
+  // Verificação administrativa no deploy sem habilitar compras ou ativações.
+  const storagePreflight = process.env.KIWIFY_STORAGE_PREFLIGHT === "1" && !!databaseUrl;
+  const pool = configured || storagePreflight ? new Pool({
     connectionString: databaseUrl,
     max: 5,
     connectionTimeoutMillis: 5000,
@@ -286,5 +288,12 @@ module.exports = function createKiwifyAuto({
     }
   });
 
+  if (storagePreflight) {
+    ready().then(() => pool.query("SELECT 1")).then(() => {
+      console.log("[KIWIFY STORAGE PREFLIGHT] ready; sales flags unchanged");
+    }).catch(error => {
+      console.error("[KIWIFY STORAGE PREFLIGHT] failed", error?.code || "storage");
+    });
+  }
   return { configured, authorizeLicense, releaseDevice, readyForClaims };
 };
