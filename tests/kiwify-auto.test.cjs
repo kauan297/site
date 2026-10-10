@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("node:assert/strict"),crypto=require("node:crypto"),vm=require("node:vm"),fs=require("node:fs");
-const PRODUCT="40cf8850-c44b-11f1-8fdf-3f2670dd515f",SECRET="development-test-only-webhook-secret-123456";
+const PRODUCT="40cf8850-c44b-11f1-8fdf-3f2670dd515f",SECRET="KiW7a9Rd16cHaRs";
 const A="A1B2C3D4E5F60718293A",B="00112233445566778899";
 const rows=new Map(),handlers=new Map(),middleware=[],stopped=[];
 class Pool{
