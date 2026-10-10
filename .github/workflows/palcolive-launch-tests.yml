@@ -1,0 +1,33 @@
+name: PalcoLive launch safety tests
+
+on:
+  push:
+    branches:
+      - palcolive-lancamento-preparo-20261010
+  pull_request:
+    branches:
+      - lunadance-server
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check syntax
+        run: |
+          node --check server.js
+          node --check sales-gate.js
+          node --check kiwify-auto.js
+          node --check public/vendas.js
+          node --check public/app.js
+      - name: Test sales security
+        run: |
+          node tests/sales-gate.test.cjs
+          node tests/sales-frontend.test.cjs
+      - name: Test Kiwify activation and refunds
+        run: node tests/kiwify-auto.test.cjs
+      - name: Test Roblox and mobile recovery panel
+        run: node tests/stability.test.cjs
