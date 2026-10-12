@@ -1,0 +1,87 @@
+name: Backup privado das licencas
+
+# INSTALAR SOMENTE no repositorio privado kauan297/palcolive-backups.
+# Este arquivo em docs/ nao executa nem agenda nada no repositorio publico.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: palcolive-license-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'kauan297/palcolive-backups' && github.event.repository.private == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: palcolive_restore_check
+          POSTGRES_USER: restore_check
+          POSTGRES_PASSWORD: disposable-local-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Load reviewed backup code
+        uses: actions/checkout@v4
+        with:
+          repository: kauan297/site
+          ref: fd643f6a27dcbd073e43ef0901e420ca4bdf4ead
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Export and authenticate encrypted backup
+        id: export
+        env:
+          PALCOLIVE_BACKUP_DATABASE_URL: ${{ secrets.PALCOLIVE_BACKUP_DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          PALCOLIVE_BACKUP_KEY: ${{ secrets.PALCOLIVE_BACKUP_KEY }}
+          PGSSLMODE: require
+        run: |
+          mkdir -p backups
+          node scripts/license-backup.cjs export backups/licenses.palcolive.enc
+          node scripts/license-backup.cjs verify backups/licenses.palcolive.enc
+      - name: Restore into disposable PostgreSQL and compare every license
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          PALCOLIVE_BACKUP_KEY: ${{ secrets.PALCOLIVE_BACKUP_KEY }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { Client } = require('pg');
+          const { decrypt, restoreSnapshot, exportSnapshot } = require('./scripts/license-backup.cjs');
+          const client = new Client({ connectionString: 'postgresql://restore_check:disposable-local-test-only@localhost:5432/palcolive_restore_check' });
+          (async () => {
+            try {
+              const snapshot = decrypt(fs.readFileSync('backups/licenses.palcolive.enc', 'utf8'), process.env.PALCOLIVE_BACKUP_KEY);
+              await client.connect();
+              await restoreSnapshot(client, snapshot, process.env.SESSION_SECRET);
+              const restored = await exportSnapshot(client, process.env.SESSION_SECRET);
+              if (JSON.stringify(restored.orders) !== JSON.stringify(snapshot.orders)) throw new Error('Mismatch');
+              console.log('PASS: todas as licencas, estados e aparelhos foram recuperados.');
+            } finally { await client.end().catch(() => {}); }
+          })().catch(() => { console.error('Falha na recuperacao; detalhes privados omitidos.'); process.exitCode = 1; });
+          NODE
+      - name: Store only the encrypted backup in private artifacts
+        if: always() && steps.export.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: licenses-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backups/licenses.palcolive.enc
+          retention-days: 30
+          if-no-files-found: error
