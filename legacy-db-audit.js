@@ -7,14 +7,22 @@ module.exports = async function auditLegacyDatabase({ env = process.env, logger 
   const connectionString = env.DATABASE_URL;
   if (!connectionString) { logger.log("[LEGACY DATABASE AUDIT] no connection configured"); return; }
   const expected = String(env.PALCOLIVE_LEGACY_DATABASE_ID || "dpg-db5337navr4c73f9l3mg-a").toLowerCase();
+  let privateInternal = false;
   try {
-    const hostname = new URL(connectionString).hostname.toLowerCase();
+    const parsed = new URL(connectionString);
+    const hostname = parsed.hostname.toLowerCase();
+    if (!["postgres:", "postgresql:"].includes(parsed.protocol)) throw new Error("unsupported connection");
     if (hostname !== expected && !hostname.startsWith(expected + ".")) {
       logger.error("[LEGACY DATABASE AUDIT] connection does not match preserved database"); return;
     }
+    privateInternal = hostname === expected && /^dpg-[a-z0-9]+-a$/.test(hostname)
+      && env.RENDER === "true" && env.RENDER_SERVICE_ID === "srv-db1qjg9srm7s73csh1f0";
   } catch { logger.error("[LEGACY DATABASE AUDIT] invalid connection; original database preserved"); return; }
+  // O endpoint interno Render usa certificado autoassinado e não suporta verify-ca/full.
+  // TLS continua obrigatório. Esta exceção só vale para o host curto conhecido,
+  // dentro do serviço Render conhecido; URLs externas mantêm validação do certificado.
   const client = new ClientClass({ connectionString, connectionTimeoutMillis: 5000,
-    ssl: env.PGSSLMODE === "require" ? { rejectUnauthorized: true } : undefined });
+    ssl: { rejectUnauthorized: !privateInternal, minVersion: "TLSv1.2" } });
   try {
     await client.connect();
     await client.query("BEGIN READ ONLY");
