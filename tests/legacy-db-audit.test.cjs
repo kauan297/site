@@ -1,10 +1,14 @@
 "use strict";
 const assert = require("node:assert/strict");
 const audit = require("../legacy-db-audit");
-async function test(count, fail = false) {
+async function test(count, fail = false, internal = true) {
   const queries = [], logs = [];
   let ended = false;
   class Client {
+    constructor(options) {
+      assert.equal(options.ssl.minVersion, "TLSv1.2");
+      assert.equal(options.ssl.rejectUnauthorized, !internal);
+    }
     async connect() { if (fail) throw new Error("postgres://PRIVATE-CREDENTIAL"); }
     async query(sql) {
       queries.push(sql);
@@ -14,7 +18,8 @@ async function test(count, fail = false) {
     }
     async end() { ended = true; }
   }
-  await audit({ env: { PALCOLIVE_LEGACY_AUDIT: "1", DATABASE_URL: "postgres://PRIVATE-CREDENTIAL", PALCOLIVE_LEGACY_DATABASE_ID: "private-credential" }, ClientClass: Client,
+  await audit({ env: { PALCOLIVE_LEGACY_AUDIT: "1", DATABASE_URL: "postgres://fixture:PRIVATE-CREDENTIAL@dpg-db5337navr4c73f9l3mg-a/fixture",
+    RENDER: internal ? "true" : "false", RENDER_SERVICE_ID: "srv-db1qjg9srm7s73csh1f0" }, ClientClass: Client,
     logger: { log: message => logs.push(message), error: message => logs.push(message) } });
   assert.ok(ended);
   assert.ok(!logs.join().includes("PRIVATE-CREDENTIAL"));
@@ -29,5 +34,5 @@ async function test(count, fail = false) {
   }
   assert.ok(!queries.some(sql => /^(DELETE|INSERT|UPDATE|CREATE|ALTER|DROP)/.test(sql)));
 }
-(async () => { await test(0); await test(2); await test(0, true); console.log("PASS: auditoria somente leitura, contagens exatas e sem dados privados nos logs."); })()
+(async () => { await test(0); await test(2); await test(0, true); await test(0, false, false); console.log("PASS: auditoria somente leitura, TLS obrigatório, certificado externo validado e logs sem dados privados."); })()
   .catch(error => { console.error(error); process.exitCode = 1; });
