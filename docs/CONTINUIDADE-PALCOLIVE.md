@@ -83,3 +83,13 @@
 
 ## Instrução ao próximo assistente/Work
 **Continuar do ponto atual, não reiniciar o projeto.** Primeiro consultar este arquivo e o repositório na branch `lunadance-server`, depois verificar estado real de GitHub, Render e Kiwify. Fazer a maior quantidade de trabalho possível sozinho e perguntar uma etapa manual por vez, com orientação visual. Não revelar nem solicitar que o usuário envie tokens, Internal Database URL, senhas, documentos, CPF ou dados bancários no chat. Nenhuma assinatura/compra/saque/alteração irreversível sem autorização explícita; nunca abrir vendas com banco temporário e integração ainda não testada. Se Work exigir novo chat, anexar o arquivo de continuidade.
+
+
+## Atualizacao em 12/10/2026 — backup real
+
+- Usuario criou `kauan297/palcolive-backups`; metadados confirmaram visibilidade private e branch main. Workflow instalado pelo conector, sem segredos em arquivos.
+- Usuario configurou SESSION_SECRET original, conexao Neon ativa e chave criptografica nos Actions secrets. Valores nao foram recebidos no chat nem exibidos.
+- Primeiro backup real executado em https://github.com/kauan297/palcolive-backups/actions/runs/38287296310: exportacao, autenticacao, restauracao em PostgreSQL 18 descartavel e comparacao de todos os registros passaram. Artefato privado `licenses-38287296310-1` confirmado, 440 bytes, expira em 11/11/2026.
+- Banco Neon exportado tinha **0 licencas**. O teste comprova conexao e recuperacao da copia atual, mas ainda nao recuperacao de acesso de comprador real. Banco Render antigo permanece preservado e nao conferido/exportado.
+- Agendamento diario configurado: 06h UTC / 03h Brasilia. Nao habilitamos planos pagos nem cobrancas adicionais. Monitorar falhas/cotas e manter chave no gerenciador de senhas. Segunda copia criptografada independente do GitHub continua pendente.
+- Checkout permaneceu indisponivel na ultima conferencia. Ainda faltam token Kiwify exposto, eventos/compra/entrega/ativacao/reembolso reais, Roblox PC/celular, suporte/termos/privacidade e revisao de lancamento. Nao abrir vendas.
