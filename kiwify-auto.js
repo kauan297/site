@@ -28,6 +28,13 @@ module.exports = function createKiwifyAuto({
   const configured = enabled && ["manual", "hybrid"].includes(String(process.env.LICENSE_MODE || "test").toLowerCase())
     && product.length >= 8 && webhookTokenValid && !!databaseUrl
     && Number.isFinite(licenseDays);
+  // Diagnóstico temporário: somente mensagens constantes, sem corpo, URL,
+  // assinatura, e-mail, pedido, licença ou qualquer segredo nos logs.
+  const diagnostics = process.env.KIWIFY_DIAGNOSTICS === "1";
+  function diagnostic(message) {
+    if (diagnostics) console.log("[KIWIFY WEBHOOK DIAGNOSTIC] " + message);
+  }
+  diagnostic(configured ? "configured" : "not configured");
   // Verificação administrativa no deploy sem habilitar compras ou ativações.
   const storagePreflight = process.env.KIWIFY_STORAGE_PREFLIGHT === "1" && !!databaseUrl;
   const pool = configured || storagePreflight ? new Pool({
@@ -138,12 +145,22 @@ module.exports = function createKiwifyAuto({
 
   // Recebimento automático das vendas. Sem assinatura válida, não processa.
   app.post("/api/kiwify/webhook", async (req, res) => {
-    if (!configured) return res.status(503).json({ ok: false, error: "Integração ainda não configurada." });
-    if (!validWebhookSignature(req)) return res.status(401).json({ ok: false, error: "Assinatura de webhook inválida." });
+    diagnostic("received");
+    if (!configured) {
+      diagnostic("rejected configuration");
+      return res.status(503).json({ ok: false, error: "Integração ainda não configurada." });
+    }
+    if (!validWebhookSignature(req)) {
+      diagnostic("rejected signature");
+      return res.status(401).json({ ok: false, error: "Assinatura de webhook inválida." });
+    }
 
     const data = req.body || {};
     const productId = String(data.Product?.product_id || "").trim();
-    if (productId !== product) return res.json({ ok: true, ignored: "produto" });
+    if (productId !== product) {
+      diagnostic("ignored product");
+      return res.json({ ok: true, ignored: "produto" });
+    }
 
     const orderId = String(data.order_id || "").trim();
     const orderRef = String(data.order_ref || "").trim();
@@ -154,8 +171,12 @@ module.exports = function createKiwifyAuto({
     const isRevoked = ["order_refunded", "chargeback", "subscription_canceled", "subscription_late"].includes(event)
       || ["refunded", "chargedback"].includes(status);
 
-    if (!isApproved && !isRevoked) return res.json({ ok: true, ignored: "evento" });
+    if (!isApproved && !isRevoked) {
+      diagnostic("ignored event");
+      return res.json({ ok: true, ignored: "evento" });
+    }
     if (!/^[A-Za-z0-9_-]{8,128}$/.test(orderId) || orderRef.length > 128 || (isApproved && !emailDigest)) {
+      diagnostic("rejected incomplete order");
       return res.status(422).json({ ok: false, error: "Pedido incompleto." });
     }
 
@@ -178,6 +199,7 @@ module.exports = function createKiwifyAuto({
         const licenseKey = makeLicenseKey(orderId, saved.rows[0].device_digest);
         await stopLive(sidForLicense(licenseKey)).catch(() => {});
       }
+      diagnostic(saved.rows[0]?.state === "revoked" ? "processed revoked" : "processed paid");
       return res.json({ ok: true });
     } catch (error) {
       console.error("[KIWIFY WEBHOOK]", error?.code || "storage");
