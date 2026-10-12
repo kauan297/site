@@ -3,6 +3,7 @@ const assert=require("node:assert/strict"),crypto=require("node:crypto"),vm=requ
 const PRODUCT="40cf8850-c44b-11f1-8fdf-3f2670dd515f",SECRET="KiW7a9Rd16cHaRs";
 const A="A1B2C3D4E5F60718293A",B="00112233445566778899";
 const rows=new Map(),handlers=new Map(),middleware=[],stopped=[];
+const diagnosticLogs=[];
 class Pool{
   async query(sql,p=[]){
     if(/^(CREATE TABLE|ALTER TABLE)/.test(sql))return{rowCount:0,rows:[]};
@@ -38,8 +39,8 @@ class Pool{
     }};
   }
 }
-const ctx={module:{exports:{}},Buffer,Date,console,process:{env:{
-KIWIFY_AUTO_ENABLED:"1",KIWIFY_PRODUCT_ID:PRODUCT,KIWIFY_WEBHOOK_TOKEN:SECRET,DATABASE_URL:"postgres://mock",KIWIFY_LICENSE_DAYS:"0",LICENSE_MODE:"manual",ROBLOX_PLACE_ID:"76605256587436"
+const ctx={module:{exports:{}},Buffer,Date,console:{log:(...a)=>diagnosticLogs.push(a.join(" ")),error:(...a)=>diagnosticLogs.push(a.join(" "))},process:{env:{
+KIWIFY_DIAGNOSTICS:"1",KIWIFY_AUTO_ENABLED:"1",KIWIFY_PRODUCT_ID:PRODUCT,KIWIFY_WEBHOOK_TOKEN:SECRET,DATABASE_URL:"postgres://mock",KIWIFY_LICENSE_DAYS:"0",LICENSE_MODE:"manual",ROBLOX_PLACE_ID:"76605256587436"
 }},require:n=>n==="pg"?{Pool}:n==="crypto"?crypto:(()=>{throw Error(n)})()};
 vm.runInNewContext(fs.readFileSync("kiwify-auto.js","utf8"),ctx,{filename:"kiwify-auto.js",timeout:2000});
 const auto=ctx.module.exports({
@@ -71,6 +72,8 @@ const claim=(email,order,machine)=>post("/api/kiwify/claim",{email,order,machine
   assert.equal((await claim("comprador@example.com","Quzqwus",A)).code,403,"recusar pedido inexistente");
   const other={...data,Product:{product_id:"00000000-0000-0000-0000-000000000000"}};
   assert.equal((await webhook(other)).body.ignored,"produto","outro produto ignorado");
+  const injected={...data,webhook_event_type:"unknown-event\nPRIVATE_PAYLOAD_SENTINEL"};
+  assert.equal((await webhook(injected)).body.ignored,"evento");
   assert.equal((await webhook(data)).code,200);
   assert.equal(rows.get(orderId).state,"paid");
   assert.equal(rows.get(orderId).expires_at,null,"sem prazo de expiração");
@@ -93,5 +96,9 @@ const claim=(email,order,machine)=>post("/api/kiwify/claim",{email,order,machine
   const result=res();
   await middleware[0]({session:{licenseMode:"kiwify",licenseInstanceId:orderId},headers:{"x-palcolive-device":A}},result,()=>{throw Error("token revogado passou")});
   assert.equal(result.code,401,"token já emitido precisa ser bloqueado");
+  const logged=diagnosticLogs.join("\n");
+  for(const privateValue of [SECRET,data.Customer.email,orderId,"PRIVATE_PAYLOAD_SENTINEL",activated.body.license_key,activated.body.device_credential]) {
+    assert.equal(logged.includes(privateValue),false,"diagnóstico não pode vazar dados privados");
+  }
   console.log("PASS: webhook assinado, produto, compra, email, dispositivo, licença sem prazo, reembolso e bloqueio.");
 })().catch(e=>{console.error(e);process.exitCode=1;});
