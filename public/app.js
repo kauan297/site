@@ -512,4 +512,10 @@ $("copyDeviceBtn").addEventListener("click",async()=>{
     window.prompt("Copie este código e envie ao vendedor:",code);
   }
 });
+// O fragmento fica no navegador; o pedido só é enviado ao confirmar a ativação.
+function prefillPurchaseOrder(){
+  const order=new URLSearchParams(window.location.hash.slice(1)).get("pedido");
+  if(order && /^[A-Za-z0-9_-]{1,128}$/.test(order)) $("kiwifyOrder").value=order;
+}
+prefillPurchaseOrder();
 boot();

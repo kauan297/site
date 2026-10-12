@@ -10,7 +10,7 @@ for (const id of ["recoveryCard", "resumeStageBtn", "copyStageBtn", "stStage", "
   assert.match(html, new RegExp('id="' + id + '"'), "Falta o componente " + id);
 }
 
-function createHarness({ mobile = false, expMs = 2 * 60 * 60 * 1000 } = {}) {
+function createHarness({ mobile = false, expMs = 2 * 60 * 60 * 1000, hash = "" } = {}) {
   const store = new Map([["palcolive_credential_v1", "v1.test"]]);
   const elements = new Map();
   const urls = [];
@@ -30,7 +30,7 @@ function createHarness({ mobile = false, expMs = 2 * 60 * 60 * 1000 } = {}) {
     }
     return elements.get(id);
   }
-  const location = { href: "https://example.com/app/" };
+  const location = { href: "https://example.com/app/", hash };
   const sessionData = () => ({
     ok: true, room_id: "room_test_123", place_id: "76605256587436",
     session_token: "signed_test_token",
@@ -46,7 +46,7 @@ function createHarness({ mobile = false, expMs = 2 * 60 * 60 * 1000 } = {}) {
     return { ok: true, status: 200, async json() { return data; } };
   };
   const context = {
-    Uint8Array, Date, Map, Set, Option: class { constructor(name, value) { this.name=name; this.value=value; } },
+    Uint8Array, Date, Map, Set, URLSearchParams, Option: class { constructor(name, value) { this.name=name; this.value=value; } },
     window: { location, matchMedia: () => ({ matches: mobile }), addEventListener() {}, prompt() {} },
     document: { getElementById: element, hidden: false, addEventListener() {} },
     navigator: {
@@ -104,6 +104,16 @@ async function checkSessionRenewal() {
   assert.match(h.location.href, /launchData=room_test_123/);
 }
 (async () => {
+  for (const mobile of [false, true]) {
+    const h = createHarness({mobile, hash: "#pedido=DEMO123"});
+    await settle();
+    assert.equal(h.element("kiwifyOrder").value, "DEMO123");
+    assert.equal(h.element("kiwifyEmail").value, "");
+    assert.ok(!h.fetchCalls.includes("/api/kiwify/claim"), "Abrir link não deve ativar a compra");
+  }
+  for (const hash of ["", "#pedido=%3Cscript%3E", "#pedido=" + "x".repeat(129)]) {
+    assert.equal(createHarness({hash}).element("kiwifyOrder").value, "");
+  }
   await checkStageRecovery(false);
   await checkStageRecovery(true);
   await checkSessionRenewal();
