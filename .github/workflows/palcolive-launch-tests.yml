@@ -25,12 +25,15 @@ jobs:
           node --check kiwify-auto.js
           node --check public/vendas.js
           node --check public/app.js
+          node --check kiwify-delivery.js
+          node --check legacy-db-audit.js
       - name: Test sales security
         run: |
           node tests/sales-gate.test.cjs
           node tests/sales-frontend.test.cjs
           node tests/kiwify-short-token.test.cjs
           node tests/kiwify-storage-preflight.test.cjs
+          node tests/legacy-db-audit.test.cjs
       - name: Test Kiwify activation and refunds
         run: node tests/kiwify-auto.test.cjs
       - name: Test encrypted license backup and safe restore
@@ -66,3 +69,9 @@ jobs:
           PALCOLIVE_DISPOSABLE_DATABASE: '1'
           TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
         run: node tests/license-backup-postgres.test.cjs
+      - name: Test concurrent activation, transfer, refunds and email recovery
+        env:
+          PALCOLIVE_DISPOSABLE_DATABASE: '1'
+          TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
+        run: node tests/purchase-postgres.test.cjs
+
