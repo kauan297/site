@@ -31,24 +31,26 @@
     <section class="card" id="activationCard">
       <h2>Primeiro acesso</h2>
       <div id="kiwifyActivation">
-        <p>Comprou o PalcoLive pela Kiwify? Ative sozinho, sem falar com o vendedor.</p>
+        <p>Abra o link de ativação enviado pelo PalcoLive: seu pedido já vem preenchido. Informe o e-mail da compra e ative neste aparelho.</p>
         <label for="kiwifyOrder">Número / referência do pedido da Kiwify</label>
-        <input id="kiwifyOrder" type="text" autocomplete="off" placeholder="Código do pedido do recibo">
+        <input id="kiwifyOrder" type="text" autocomplete="off" placeholder="Pedido preenchido pelo seu link de ativação">
         <label for="kiwifyEmail">E-mail usado na compra</label>
         <input id="kiwifyEmail" type="email" autocomplete="email" placeholder="voce@exemplo.com">
         <button type="button" id="kiwifyActivateBtn" class="primary wide">ATIVAR MINHA COMPRA AUTOMATICAMENTE</button>
+        <button type="button" id="kiwifyDeliveryBtn" class="secondary wide" style="margin-top:10px" disabled>RECEBER MEU LINK POR E-MAIL</button>
+        <p id="kiwifyDeliveryStatus" style="margin-top:10px" role="status">Use o e-mail da compra para solicitar seu link.</p>
         <p id="kiwifySetupStatus" class="warn" style="margin-top:10px"></p>
       </div>
       <details id="manualActivation">
         <summary style="cursor:pointer;padding:12px 0"><b>Já recebi uma chave de licença? Abrir ativação manual</b></summary>
         <p>Código do seu aparelho: <code id="deviceCode">CARREGANDO...</code></p>
         <button type="button" id="copyDeviceBtn" class="secondary">COPIAR CÓDIGO</button>
-      <p style="font-size:12px">Ao ativar, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
       <div class="row" id="manualLicenseRow">
         <input id="licenseInput" type="password" placeholder="Chave de licença manual" autocomplete="off">
         <button id="activateBtn" class="primary">ATIVAR CHAVE</button>
       </div>
       </details>
+      <p style="font-size:12px">Ao ativar, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
     </section>
 
     <section class="card hidden" id="mainCard">
@@ -150,3 +152,4 @@
   <script src="./app.js" defer></script>
 </body>
 </html>
+
