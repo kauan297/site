@@ -173,6 +173,10 @@ async function config(){
         ? "Pagamento aprovado? Informe o pedido e o e-mail da compra para liberar automaticamente."
         : "A ativação automática ainda não foi configurada pelo vendedor.";
     }
+    $("kiwifyDeliveryBtn").disabled=!d.kiwifyDeliveryReady;
+    $("kiwifyDeliveryStatus").textContent=d.kiwifyDeliveryReady
+      ? "Não recebeu o link do PalcoLive? Informe seu e-mail acima e toque em RECEBER MEU LINK POR E-MAIL."
+      : "O envio de links por e-mail ainda não está disponível. Use o suporte indicado no e-mail da Kiwify.";
     return d;
   }catch{setStatus("stServer","offline","bad");return null}
 }
@@ -497,6 +501,18 @@ $("kiwifyActivateBtn").addEventListener("click",async()=>{
     msg("Compra confirmada! Acesso liberado automaticamente neste aparelho.","ok");
   }catch(e){msg(e.message||"Falha na ativação automática.","error");}
   finally{button.disabled=false;button.textContent="ATIVAR MINHA COMPRA AUTOMATICAMENTE";}
+});
+$("kiwifyDeliveryBtn").addEventListener("click",async()=>{
+  const email=$("kiwifyEmail").value.trim();
+  if(!email){msg("Informe o e-mail usado na compra para receber seu link.","warn");return;}
+  const button=$("kiwifyDeliveryBtn");
+  button.disabled=true;
+  try{
+    const d=await api("/api/kiwify/delivery",{email});
+    if(!d.ok)throw new Error(d.error||"Não foi possível solicitar o link.");
+    msg(d.message,"ok");
+  }catch(e){msg(e.message,"error");}
+  finally{button.disabled=false;}
 });
 $("deviceCode").textContent=machineCode();
 $("copyDeviceBtn").addEventListener("click",async()=>{

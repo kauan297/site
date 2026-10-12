@@ -9,7 +9,7 @@ const { Pool } = require("pg");
 
 module.exports = function createKiwifyAuto({
   app, sessionSecret, hashDevice, validMachineCode, sidForLicense,
-  createSessionToken, encryptDeviceCredential, getSession, limited, stopLive
+  createSessionToken, encryptDeviceCredential, getSession, limited, stopLive, delivery
 }) {
   const enabled = String(process.env.KIWIFY_AUTO_ENABLED || "") === "1";
   const product = String(process.env.KIWIFY_PRODUCT_ID || "").trim();
@@ -199,6 +199,12 @@ module.exports = function createKiwifyAuto({
         const licenseKey = makeLicenseKey(orderId, saved.rows[0].device_digest);
         await stopLive(sidForLicense(licenseKey)).catch(() => {});
       }
+      if (saved.rows[0]?.state === "revoked") {
+        await delivery?.cancel(orderId);
+      } else if (delivery?.enabled) {
+        await delivery.queue(orderId, data.Customer?.email);
+        delivery.drain().catch(() => {});
+      }
       diagnostic(saved.rows[0]?.state === "revoked" ? "processed revoked" : "processed paid");
       return res.json({ ok: true });
     } catch (error) {
@@ -317,5 +323,6 @@ module.exports = function createKiwifyAuto({
       console.error("[KIWIFY STORAGE PREFLIGHT] failed", error?.code || "storage");
     });
   }
-  return { configured, authorizeLicense, releaseDevice, readyForClaims };
+  return { configured, authorizeLicense, releaseDevice, readyForClaims, close: () => pool?.end() };
 };
+
