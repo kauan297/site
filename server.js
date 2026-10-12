@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const path = require("path");
 const createTikTokDirect = require("./tiktok-direct");
 const createKiwifyAuto = require("./kiwify-auto");
+const createKiwifyDelivery = require("./kiwify-delivery");
+const auditLegacyDatabase = require("./legacy-db-audit");
 const { publicSalesState } = require("./sales-gate");
 
 const app = express();
@@ -449,7 +451,14 @@ async function publishRobloxSession(topic, message) {
 
 // Rotas de compra automática, ativação pelo próprio comprador e bloqueio pós-reembolso.
 // Sem env Kiwify + banco de dados, todas as novas rotas ficam desativadas.
+const deliveryPool = process.env.KIWIFY_DELIVERY_ENABLED === "1" && (process.env.KIWIFY_DATABASE_URL || process.env.DATABASE_URL) ? new (require("pg").Pool)({
+  connectionString: process.env.KIWIFY_DATABASE_URL || process.env.DATABASE_URL,
+  max: 2, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000,
+  ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: true } : undefined
+}) : null;
+const kiwifyDelivery = createKiwifyDelivery({ sessionSecret: SESSION_SECRET, pool: deliveryPool });
 const kiwifyAuto = createKiwifyAuto({
+  delivery: kiwifyDelivery,
   app,
   sessionSecret: SESSION_SECRET,
   hashDevice,
@@ -529,9 +538,10 @@ app.get("/health", (req, res) => {
 
 app.get("/api/config", async (req, res) => {
   const kiwifyAutomaticReady = await kiwifyAuto.readyForClaims();
+  const kiwifyDeliveryReady = await kiwifyDelivery.readyForDelivery();
   const sales = publicSalesState({
     enabled: process.env.PUBLIC_SALES_ENABLED === "1",
-    automaticReady: kiwifyAutomaticReady,
+    automaticReady: kiwifyAutomaticReady && kiwifyDeliveryReady,
     checkoutUrl: process.env.KIWIFY_CHECKOUT_URL,
     checkoutCode: process.env.KIWIFY_CHECKOUT_CODE
   });
@@ -543,8 +553,32 @@ app.get("/api/config", async (req, res) => {
     isolatedRooms: true,
     commercialReady: commercialModeEnabled(),
     kiwifyAutomaticReady,
+    kiwifyDeliveryReady,
     ...sales
   });
+});
+
+app.post("/api/kiwify/delivery", async (req, res) => {
+  if (limited("kiwify-delivery:" + clientIp(req), 5, 15 * 60_000)) {
+    return res.status(429).json({ ok: false, error: "Aguarde alguns minutos antes de pedir outro link." });
+  }
+  const email = createKiwifyDelivery.cleanEmail(req.body?.email);
+  if (!email) return res.status(400).json({ ok: false, error: "Informe o e-mail usado na compra." });
+  const emailBucket = crypto.createHmac("sha256", SESSION_SECRET).update("delivery:" + email).digest("hex");
+  if (limited("delivery-email:" + emailBucket, 3, 60 * 60_000)) {
+    return res.status(429).json({ ok: false, error: "Aguarde antes de pedir outro link para esse e-mail." });
+  }
+  if (!kiwifyAuto.configured || !kiwifyDelivery.configured) {
+    return res.status(503).json({ ok: false, error: "O envio de links ainda não está disponível. Use o suporte indicado no e-mail da Kiwify." });
+  }
+  try {
+    if (!await kiwifyAuto.readyForClaims() || !await kiwifyDelivery.readyForDelivery()) throw new Error("not ready");
+    await kiwifyDelivery.requestLink(email);
+    kiwifyDelivery.drain().catch(() => {});
+    return res.status(202).json({ ok: true, message: "Se existir uma compra aprovada com esse e-mail, você receberá o link do PalcoLive. Confira também o spam." });
+  } catch {
+    return res.status(503).json({ ok: false, error: "Não foi possível solicitar o link agora. Tente novamente em alguns minutos." });
+  }
 });
 
 app.post("/api/activate", async (req, res) => {
@@ -931,4 +965,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("Universe: " + ROBLOX_UNIVERSE_ID + " | Place: " + ROBLOX_PLACE_ID);
   console.log("License mode: " + LICENSE_MODE);
   console.log("TikTok provider: " + (EULER_API_KEY ? "Euler Cloud WebSocket configured" : "Euler key missing"));
+  kiwifyDelivery.start();
+  auditLegacyDatabase().catch(() => {});
 });
+
