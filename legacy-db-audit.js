@@ -6,6 +6,13 @@ module.exports = async function auditLegacyDatabase({ env = process.env, logger 
   if (!ClientClass) ClientClass = require("pg").Client;
   const connectionString = env.DATABASE_URL;
   if (!connectionString) { logger.log("[LEGACY DATABASE AUDIT] no connection configured"); return; }
+  const expected = String(env.PALCOLIVE_LEGACY_DATABASE_ID || "dpg-db5337navr4c73f9l3mg-a").toLowerCase();
+  try {
+    const hostname = new URL(connectionString).hostname.toLowerCase();
+    if (hostname !== expected && !hostname.startsWith(expected + ".")) {
+      logger.error("[LEGACY DATABASE AUDIT] connection does not match preserved database"); return;
+    }
+  } catch { logger.error("[LEGACY DATABASE AUDIT] invalid connection; original database preserved"); return; }
   const client = new ClientClass({ connectionString, connectionTimeoutMillis: 5000,
     ssl: env.PGSSLMODE === "require" ? { rejectUnauthorized: true } : undefined });
   try {
@@ -23,10 +30,11 @@ module.exports = async function auditLegacyDatabase({ env = process.env, logger 
       rows += Number(count.rows[0].total);
     }
     await client.query("ROLLBACK");
-    logger.log("[LEGACY DATABASE AUDIT] " + JSON.stringify({ tables: tables.rows.length, rows,
+    logger.log("[LEGACY DATABASE AUDIT] " + JSON.stringify({ verifiedLegacyHost: true, tables: tables.rows.length, rows,
       empty: rows === 0, migrationRequired: rows !== 0 }));
-  } catch {
+  } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
-    logger.error("[LEGACY DATABASE AUDIT] unavailable; original database preserved");
+    const code = /^[A-Z0-9_]{1,40}$/.test(error?.code || "") ? error.code : "connection";
+    logger.error("[LEGACY DATABASE AUDIT] unavailable " + code + "; original database preserved");
   } finally { await client.end().catch(() => {}); }
 };
