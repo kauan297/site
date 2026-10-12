@@ -14,7 +14,7 @@ async function test(count, fail = false) {
     }
     async end() { ended = true; }
   }
-  await audit({ env: { PALCOLIVE_LEGACY_AUDIT: "1", DATABASE_URL: "postgres://PRIVATE-CREDENTIAL" }, ClientClass: Client,
+  await audit({ env: { PALCOLIVE_LEGACY_AUDIT: "1", DATABASE_URL: "postgres://PRIVATE-CREDENTIAL", PALCOLIVE_LEGACY_DATABASE_ID: "private-credential" }, ClientClass: Client,
     logger: { log: message => logs.push(message), error: message => logs.push(message) } });
   assert.ok(ended);
   assert.ok(!logs.join().includes("PRIVATE-CREDENTIAL"));
