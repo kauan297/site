@@ -143,6 +143,10 @@ module.exports = function createKiwifyAuto({
     });
   }
 
+  // Destino de integrações substituídas: confirma recebimento sem ler o pedido,
+  // consultar o banco, enviar e-mail ou conceder qualquer acesso.
+  app.post("/api/kiwify/webhook-retired", (_req, res) => res.json({ ok: true, retired: true }));
+
   // Recebimento automático das vendas. Sem assinatura válida, não processa.
   app.post("/api/kiwify/webhook", async (req, res) => {
     diagnostic("received");

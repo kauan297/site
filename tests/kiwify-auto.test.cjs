@@ -68,6 +68,13 @@ const webhook=(body,signature=sig(body))=>post("/api/kiwify/webhook",body,signat
 const claim=(email,order,machine)=>post("/api/kiwify/claim",{email,order,machine_code:machine});
 (async()=>{
   assert.equal(await auto.readyForClaims(),true,"o banco está disponível");
+  const beforeRetired = diagnosticLogs.length;
+  const retired = await post("/api/kiwify/webhook-retired", data, "invalid");
+  assert.equal(retired.code,200);
+  assert.equal(retired.body.retired,true);
+  assert.equal(rows.size,0,"integração aposentada não cria compra");
+  assert.equal(stopped.length,0,"integração aposentada não altera LIVE");
+  assert.equal(diagnosticLogs.length,beforeRetired,"não registra corpo ou processa webhook antigo");
   assert.equal((await webhook(data,"wrong")).code,401,"recusar assinatura falsa");
   assert.equal((await claim("comprador@example.com","Quzqwus",A)).code,403,"recusar pedido inexistente");
   const other={...data,Product:{product_id:"00000000-0000-0000-0000-000000000000"}};
