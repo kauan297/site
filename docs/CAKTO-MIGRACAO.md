@@ -18,7 +18,7 @@ A Cakto envia o guia de acesso por e-mail. O comprador usa o número exibido em 
 
 Destino: `https://lunadance-server.onrender.com/api/cakto/webhook`.
 Eventos: `purchase_approved`, `refund`, `chargeback`. Modelo V1 e V2 são aceitos.
-Validação obrigatória de `X-Cakto-Signature: v1=<HMAC-SHA256>` e `X-Cakto-Timestamp`, no corpo cru, com tolerância de cinco minutos. Corpo sem assinatura não cria licença. Um webhook da plataforma com produto diferente é ignorado.
+Validação obrigatória de `X-Cakto-Signature: v1=<HMAC-SHA256>` e `X-Cakto-Timestamp`, no corpo cru, com tolerância de cinco minutos. Por padrão, corpo sem assinatura não cria licença. A Cakto também documenta validação pelo `secret` no corpo. `CAKTO_ALLOW_LEGACY_SECRET=1` habilita esse contrato alternativo apenas em HTTPS e quando ambos os headers de assinatura estão ausentes. Header presente e inválido nunca pode cair para o método alternativo. Habilitar somente após conferir o formato efetivamente entregue pela plataforma. Um webhook da plataforma com produto diferente é ignorado.
 
 Falhas de armazenamento retornam erro. A Cakto não reenvia automaticamente respostas HTTP de erro; acompanhar entregas e reenviar eventos que falharem pelo painel.
 

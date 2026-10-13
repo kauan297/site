@@ -141,6 +141,18 @@ module.exports = function createCaktoAuto({
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received));
   }
 
+  function validLegacySecret(req) {
+    // A Cakto também documenta autenticação pela chave no corpo. Usar apenas
+    // quando explicitamente configurado, em HTTPS e sem headers de assinatura.
+    // Header presente e inválido nunca pode cair para o método alternativo.
+    if (process.env.CAKTO_ALLOW_LEGACY_SECRET !== "1" || req.secure !== true ||
+        req.headers?.["x-cakto-signature"] || req.headers?.["x-cakto-timestamp"] ||
+        typeof req.body?.secret !== "string" || !webhookTokenValid) return false;
+    const received = Buffer.from(req.body.secret);
+    const expected = Buffer.from(token);
+    return received.length === expected.length && crypto.timingSafeEqual(received, expected);
+  }
+
   // Recebimento automático das vendas. Sem assinatura válida, não processa.
   async function processOrder(data, res) {
     const productId = String(data.product?.id || "").trim();
@@ -196,7 +208,15 @@ module.exports = function createCaktoAuto({
 
   app.post("/api/cakto/webhook", async (req, res) => {
     if (!configured) return res.status(503).json({ ok: false, error: "Integração ainda não configurada." });
-    if (!validWebhookSignature(req)) return res.status(401).json({ ok: false, error: "Assinatura de webhook inválida." });
+    if (!validWebhookSignature(req) && !validLegacySecret(req)) {
+      diagnostic(req.headers?.["x-cakto-signature"] ? "signature header present" : "signature header missing");
+      diagnostic(req.headers?.["x-cakto-timestamp"] ? "timestamp header present" : "timestamp header missing");
+      const supplied = typeof req.body?.secret === "string" ? Buffer.from(req.body.secret) : Buffer.alloc(0);
+      const expected = Buffer.from(token);
+      diagnostic(supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected)
+        ? "body secret matches" : "body secret mismatch");
+      return res.status(401).json({ ok: false, error: "Assinatura de webhook inválida." });
+    }
     const payload = req.body || {};
     if (!["purchase_approved", "refund", "chargeback"].includes(payload.event)) {
       return res.json({ ok: true, ignored: "evento" });

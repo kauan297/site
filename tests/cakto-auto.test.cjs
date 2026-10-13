@@ -25,13 +25,21 @@ const response=()=>({code:200,status(n){this.code=n;return this;},json(b){this.b
 const order='b3df956e-1998-4322-b091-ac0c54f7b4ba';
 const data={id:order,refId:'Ab12Cd3',status:'paid',product:{id:product},customer:{email:'buyer@example.invalid',docNumber:'PRIVATE_DOC_SENTINEL',name:'PRIVATE_NAME_SENTINEL'}};
 const payload={secret,event:'purchase_approved',data};
-async function webhook(body,options={}){const raw=options.raw||JSON.stringify(body),timestamp=String(options.timestamp||Math.floor(Date.now()/1000));const signature='v1='+crypto.createHmac('sha256',secret).update(timestamp+'.'+raw).digest('hex');const r=response();await routes.get('/api/cakto/webhook')({body,rawBody:raw,headers:options.missing?{}:{'x-cakto-timestamp':timestamp,'x-cakto-signature':options.bad?'v1='+'0'.repeat(64):signature}},r);return r;}
+async function webhook(body,options={}){const raw=options.raw||JSON.stringify(body),timestamp=String(options.timestamp||Math.floor(Date.now()/1000));const signature='v1='+crypto.createHmac('sha256',secret).update(timestamp+'.'+raw).digest('hex');const r=response();await routes.get('/api/cakto/webhook')({body,rawBody:raw,secure:options.secure!==false,headers:options.missing?{}:{'x-cakto-timestamp':timestamp,'x-cakto-signature':options.bad?'v1='+'0'.repeat(64):signature}},r);return r;}
 async function claim(email,ref,machine){const r=response();await routes.get('/api/cakto/claim')({body:{email,order:ref,machine_code:machine},ip:'fixture'},r);return r;}
 (async()=>{
  assert.equal(auto.configured,true);assert.equal(await auto.readyForClaims(),true);
  assert.equal((await webhook(payload,{bad:true})).code,401);
  assert.equal((await webhook(payload,{missing:true})).code,401,'secret alone cannot replace a signature');
  assert.equal((await webhook(payload,{timestamp:Math.floor(Date.now()/1000)-301})).code,401,'reject replay');
+ context.process.env.CAKTO_ALLOW_LEGACY_SECRET='1';
+ const ignored={...payload,data:{...data,product:{id:'unrelated-product'}}};
+ assert.equal((await webhook(ignored,{missing:true})).code,200,'explicit HTTPS legacy secret is supported');
+ assert.equal((await webhook({...ignored,secret:'incorrect-secret'},{missing:true})).code,401);
+ assert.equal((await webhook(ignored,{missing:true,secure:false})).code,401,'never accept legacy secret over plain HTTP');
+ assert.equal((await webhook(ignored,{bad:true})).code,401,'invalid signature cannot downgrade to body secret');
+ assert.equal((await webhook(ignored,{timestamp:Math.floor(Date.now()/1000)-301})).code,401,'signed stale delivery cannot downgrade');
+ delete context.process.env.CAKTO_ALLOW_LEGACY_SECRET;
  const raw=JSON.stringify(payload,null,2);assert.equal((await webhook(payload,{raw})).code,200,'sign exact raw bytes');
  const id='CAKTO_'+order;assert.equal(rows.size,1);assert.equal(rows.get(id).expires_at,null);
  assert.equal((await webhook(payload)).code,200);assert.equal(rows.size,1);
