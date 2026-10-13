@@ -236,7 +236,7 @@ module.exports = function createKiwifyAuto({
       client = await pool.connect();
       await client.query("BEGIN");
       const find = await client.query(
-        "SELECT order_id, state, device_digest, expires_at FROM palcolive_kiwify_orders WHERE email_digest=$1 AND (order_id=$2 OR order_ref=$2) FOR UPDATE",
+        "SELECT order_id, state, device_digest, expires_at FROM palcolive_kiwify_orders WHERE email_digest=$1 AND (order_id=$2 OR order_ref=$2) AND left(order_id,6)<>'CAKTO_' FOR UPDATE",
         [emailDigest, order]
       );
       if (find.rowCount !== 1 || find.rows[0].state !== "paid") {

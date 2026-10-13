@@ -25,3 +25,9 @@ const published=publicSalesState({...params,enabled:true,automaticReady:true});
 assert.equal(published.salesReady,true);
 assert.equal(published.checkoutUrl,url);
 console.log("PASS: vendas bloqueadas por padrão, checkout apenas Kiwify Pix/boleto e link validado.");
+
+const caktoUrl="https://pay.cakto.com.br/abc1234";
+assert.equal(validateCheckoutUrl(caktoUrl,"abc1234","cakto"),caktoUrl);
+for(const bad of [caktoUrl+"?coupon=private",caktoUrl+"#x","https://pay.cakto.com.br.evil.com/abc1234","https://user:pass@pay.cakto.com.br/abc1234","https://pay.cakto.com.br:444/abc1234"]){assert.equal(validateCheckoutUrl(bad,"abc1234","cakto"),"");}
+assert.equal(publicSalesState({provider:"cakto",checkoutUrl:caktoUrl,checkoutCode:"abc1234",enabled:true,automaticReady:false}).salesReady,false);
+assert.equal(publicSalesState({provider:"cakto",checkoutUrl:caktoUrl,checkoutCode:"abc1234",enabled:true,automaticReady:true}).checkoutUrl,caktoUrl);
