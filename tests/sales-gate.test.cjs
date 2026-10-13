@@ -28,6 +28,17 @@ console.log("PASS: vendas bloqueadas por padrão, checkout apenas Kiwify Pix/bol
 
 const caktoUrl="https://pay.cakto.com.br/abc1234";
 assert.equal(validateCheckoutUrl(caktoUrl,"abc1234","cakto"),caktoUrl);
+const originalCaktoCode="qmv857o_1198545";
+const originalCaktoUrl="https://pay.cakto.com.br/"+originalCaktoCode;
+assert.equal(validateCheckoutUrl(originalCaktoUrl,originalCaktoCode,"cakto"),originalCaktoUrl);
+assert.equal(publicSalesState({provider:"cakto",checkoutUrl:originalCaktoUrl,checkoutCode:originalCaktoCode,enabled:true,automaticReady:true}).checkoutUrl,originalCaktoUrl);
+for(const code of ["qmv857o_offer","qmv857o_","qmv857o_1198545_extra","qmv857o/1198545","qmv857o_1234567890123"]){
+  assert.equal(validateCheckoutUrl("https://pay.cakto.com.br/"+code,code,"cakto"),"");
+}
+for(const bad of [originalCaktoUrl+"?coupon=private",originalCaktoUrl+"#x","https://pay.cakto.com.br.evil.com/"+originalCaktoCode,"https://user:pass@pay.cakto.com.br/"+originalCaktoCode,"https://pay.cakto.com.br:444/"+originalCaktoCode]){
+  assert.equal(validateCheckoutUrl(bad,originalCaktoCode,"cakto"),"");
+}
+assert.equal(validateCheckoutUrl("https://pay.kiwify.com.br/"+originalCaktoCode+"?hideCard=true",originalCaktoCode,"kiwify"),"");
 for(const bad of [caktoUrl+"?coupon=private",caktoUrl+"#x","https://pay.cakto.com.br.evil.com/abc1234","https://user:pass@pay.cakto.com.br/abc1234","https://pay.cakto.com.br:444/abc1234"]){assert.equal(validateCheckoutUrl(bad,"abc1234","cakto"),"");}
 assert.equal(publicSalesState({provider:"cakto",checkoutUrl:caktoUrl,checkoutCode:"abc1234",enabled:true,automaticReady:false}).salesReady,false);
 assert.equal(publicSalesState({provider:"cakto",checkoutUrl:caktoUrl,checkoutCode:"abc1234",enabled:true,automaticReady:true}).checkoutUrl,caktoUrl);

@@ -4,7 +4,10 @@
 // A URL do checkout é validada no servidor antes de aparecer publicamente.
 function validateCheckoutUrl(value, checkoutCode, provider = "kiwify") {
   const code = String(checkoutCode || "").trim();
-  if (!/^[A-Za-z0-9]{5,24}$/.test(code)) return "";
+  const validCode = provider === "cakto"
+    ? /^[A-Za-z0-9]{5,24}(?:_[0-9]{1,12})?$/
+    : /^[A-Za-z0-9]{5,24}$/;
+  if (!validCode.test(code)) return "";
   try {
     const parsed = new URL(String(value || ""));
     const params = [...parsed.searchParams.entries()];
