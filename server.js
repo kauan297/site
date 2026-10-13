@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const createTikTokDirect = require("./tiktok-direct");
 const createKiwifyAuto = require("./kiwify-auto");
+const createCaktoAuto = require("./cakto-auto");
 const createKiwifyDelivery = require("./kiwify-delivery");
 const auditLegacyDatabase = require("./legacy-db-audit");
 const { publicSalesState } = require("./sales-gate");
@@ -24,7 +25,7 @@ app.use(express.json({
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-PalcoLive-Version", "14");
+  res.setHeader("X-PalcoLive-Version", "15");
   next();
 });
 
@@ -369,6 +370,9 @@ async function authorizeLicense({ licenseKey, instanceId, deviceName, machineCod
   if (!validMachineCode(machineCode)) {
     return { ok: false, error: "Dispositivo inválido." };
   }
+  if (typeof licenseKey === "string" && licenseKey.startsWith("CKT1.")) {
+    return caktoAuto.authorizeLicense(licenseKey, machineCode);
+  }
   if (typeof licenseKey === "string" && licenseKey.startsWith("KWF1.")) {
     return kiwifyAuto.authorizeLicense(licenseKey, machineCode);
   }
@@ -472,6 +476,20 @@ const kiwifyAuto = createKiwifyAuto({
     if (typeof tiktokDirect !== "undefined") await tiktokDirect.stop(sid);
   }
 });
+const caktoAuto = createCaktoAuto({
+  app,
+  sessionSecret: SESSION_SECRET,
+  hashDevice,
+  validMachineCode,
+  sidForLicense,
+  createSessionToken,
+  encryptDeviceCredential,
+  getSession,
+  limited,
+  stopLive: async (sid) => {
+    if (typeof tiktokDirect !== "undefined") await tiktokDirect.stop(sid);
+  }
+});
 
 app.get("/admin", (req, res) => res.redirect(302, "/app/admin.html"));
 
@@ -529,29 +547,36 @@ app.use("/app", express.static(path.join(__dirname, "public"), {
 }));
 
 app.get("/", (req, res) => {
-  res.json({ name: "PalcoLive Server", ok: true, version: 14, app: "/app/" });
+  res.json({ name: "PalcoLive Server", ok: true, version: 15, app: "/app/" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, version: 14 });
+  res.json({ ok: true, version: 15 });
 });
 
 app.get("/api/config", async (req, res) => {
   const kiwifyAutomaticReady = await kiwifyAuto.readyForClaims();
   const kiwifyDeliveryReady = await kiwifyDelivery.readyForDelivery();
+  const caktoAutomaticReady = await caktoAuto.readyForClaims();
+  const paymentProvider = process.env.PAYMENT_PROVIDER === "cakto" ? "cakto" : "kiwify";
+  const caktoDeliveryReady = caktoAutomaticReady && process.env.CAKTO_NATIVE_DELIVERY_READY === "1";
   const sales = publicSalesState({
+    provider: paymentProvider,
     enabled: process.env.PUBLIC_SALES_ENABLED === "1",
-    automaticReady: kiwifyAutomaticReady && kiwifyDeliveryReady,
-    checkoutUrl: process.env.KIWIFY_CHECKOUT_URL,
-    checkoutCode: process.env.KIWIFY_CHECKOUT_CODE
+    automaticReady: paymentProvider === "cakto" ? caktoDeliveryReady : kiwifyAutomaticReady && kiwifyDeliveryReady,
+    checkoutUrl: paymentProvider === "cakto" ? process.env.CAKTO_CHECKOUT_URL : process.env.KIWIFY_CHECKOUT_URL,
+    checkoutCode: paymentProvider === "cakto" ? process.env.CAKTO_CHECKOUT_CODE : process.env.KIWIFY_CHECKOUT_CODE
   });
   res.json({
     placeId: ROBLOX_PLACE_ID,
-    version: 14,
+    version: 15,
     mobileApp: "/app/",
     tiktokReady: Boolean(EULER_API_KEY),
     isolatedRooms: true,
     commercialReady: commercialModeEnabled(),
+    paymentProvider,
+    caktoAutomaticReady,
+    caktoDeliveryReady,
     kiwifyAutomaticReady,
     kiwifyDeliveryReady,
     ...sales
@@ -732,6 +757,11 @@ app.post("/api/deactivate-device", async (req, res) => {
     const licenseKey = stored.licenseKey.trim();
     const instanceId = stored.instanceId || null;
 
+    if (licenseKey.startsWith("CKT1.")) {
+      const released = await caktoAuto.releaseDevice(licenseKey, machineCode);
+      if (!released.ok) return res.status(409).json({ ok: false, error: "Não foi possível liberar este aparelho." });
+      return res.json({ ok: true, deactivated: true });
+    }
     if (licenseKey.startsWith("KWF1.")) {
       const released = await kiwifyAuto.releaseDevice(licenseKey, machineCode);
       if (!released.ok) {

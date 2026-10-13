@@ -31,9 +31,11 @@
     <section class="card" id="activationCard">
       <h2>Primeiro acesso</h2>
       <div id="kiwifyActivation">
-        <p>Abra o link de ativação enviado pelo PalcoLive: seu pedido já vem preenchido. Informe o e-mail da compra e ative neste aparelho.</p>
-        <label for="kiwifyOrder">Número / referência do pedido da Kiwify</label>
-        <input id="kiwifyOrder" type="text" autocomplete="off" placeholder="Pedido preenchido pelo seu link de ativação">
+        <p>Abra o e-mail de pagamento confirmado da Cakto. Copie o número que aparece em <strong>Pedido</strong>, informe abaixo junto do e-mail da compra e ative neste aparelho.</p>
+        <label for="purchaseProvider">Onde você comprou?</label>
+        <select id="purchaseProvider"><option value="cakto">Cakto</option><option value="kiwify">Kiwify (compra anterior)</option></select>
+        <label for="kiwifyOrder">Número / referência do pedido</label>
+        <input id="kiwifyOrder" type="text" autocomplete="off" placeholder="Número do pedido no e-mail, sem o #">
         <label for="kiwifyEmail">E-mail usado na compra</label>
         <input id="kiwifyEmail" type="email" autocomplete="email" placeholder="voce@exemplo.com">
         <button type="button" id="kiwifyActivateBtn" class="primary wide">ATIVAR MINHA COMPRA AUTOMATICAMENTE</button>

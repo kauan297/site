@@ -23,6 +23,7 @@ jobs:
           node --check server.js
           node --check sales-gate.js
           node --check kiwify-auto.js
+          node --check cakto-auto.js
           node --check public/vendas.js
           node --check public/app.js
           node --check kiwify-delivery.js
@@ -35,7 +36,9 @@ jobs:
           node tests/kiwify-storage-preflight.test.cjs
           node tests/legacy-db-audit.test.cjs
       - name: Test Kiwify activation and refunds
-        run: node tests/kiwify-auto.test.cjs
+        run: |
+          node tests/kiwify-auto.test.cjs
+          node tests/cakto-auto.test.cjs
       - name: Test encrypted license backup and safe restore
         run: node tests/license-backup.test.cjs
       - name: Test Roblox and mobile recovery panel
@@ -75,3 +78,9 @@ jobs:
           TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
         run: node tests/purchase-postgres.test.cjs
 
+
+      - name: Test Cakto concurrent activation and refunds
+        env:
+          PALCOLIVE_DISPOSABLE_DATABASE: '1'
+          TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
+        run: node tests/cakto-postgres.test.cjs

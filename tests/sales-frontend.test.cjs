@@ -36,5 +36,10 @@ async function test(config){
   assert.equal(active.element("salesCheckoutButton").style.display,"flex");
   assert.equal(active.element("salesCheckoutPending").style.display,"none");
   assert.equal(active.element("salesCheckoutButton").href,"https://pay.kiwify.com.br/zNBj6FP?hideCard=true");
+  const cakto=await test({paymentProvider:"cakto",salesReady:true,checkoutUrl:"https://pay.cakto.com.br/abc1234"});
+  assert.equal(cakto.element("salesCheckoutButton").style.display,"flex");
+  assert.match(cakto.element("salesCheckoutDescription").textContent,/Cakto/);
+  const privateCoupon=await test({paymentProvider:"cakto",salesReady:true,checkoutUrl:"https://pay.cakto.com.br/abc1234?coupon=private"});
+  assert.equal(privateCoupon.element("salesCheckoutButton").style.display,"none");
   console.log("PASS: o checkout só aparece com resposta segura do servidor e Pix/boleto.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
