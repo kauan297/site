@@ -39,6 +39,14 @@ async function test(config){
   const cakto=await test({paymentProvider:"cakto",salesReady:true,checkoutUrl:"https://pay.cakto.com.br/abc1234"});
   assert.equal(cakto.element("salesCheckoutButton").style.display,"flex");
   assert.match(cakto.element("salesCheckoutDescription").textContent,/Cakto/);
+  const originalUrl="https://pay.cakto.com.br/qmv857o_1198545";
+  const original=await test({paymentProvider:"cakto",salesReady:true,checkoutUrl:originalUrl});
+  assert.equal(original.element("salesCheckoutButton").style.display,"flex");
+  assert.equal(original.element("salesCheckoutButton").href,originalUrl);
+  for(const checkoutUrl of [originalUrl+"?coupon=private",originalUrl+"#x","https://pay.cakto.com.br.evil.com/qmv857o_1198545","https://user:pass@pay.cakto.com.br/qmv857o_1198545","https://pay.cakto.com.br/qmv857o_offer","https://pay.kiwify.com.br/qmv857o_1198545?hideCard=true"]){
+    const invalidOriginal=await test({paymentProvider:checkoutUrl.includes("kiwify")?"kiwify":"cakto",salesReady:true,checkoutUrl});
+    assert.equal(invalidOriginal.element("salesCheckoutButton").style.display,"none",checkoutUrl);
+  }
   const privateCoupon=await test({paymentProvider:"cakto",salesReady:true,checkoutUrl:"https://pay.cakto.com.br/abc1234?coupon=private"});
   assert.equal(privateCoupon.element("salesCheckoutButton").style.display,"none");
   console.log("PASS: o checkout só aparece com resposta segura do servidor e Pix/boleto.");

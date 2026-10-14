@@ -80,8 +80,9 @@
       try { url=new URL(data.checkoutUrl); } catch { return; }
       const params=[...url.searchParams.entries()];
       const cakto=data.paymentProvider==="cakto";
+      const validPath=cakto ? /^\/[A-Za-z0-9]{5,24}(?:_[0-9]{1,12})?$/ : /^\/[A-Za-z0-9]{5,24}$/;
       if(url.protocol!=="https:" || url.username || url.password || url.port || url.hash ||
-          !/^\/[A-Za-z0-9]{5,24}$/.test(url.pathname)) return;
+          !validPath.test(url.pathname)) return;
       if(cakto){if(url.hostname!=="pay.cakto.com.br" || params.length) return;}
       else if(url.hostname!=="pay.kiwify.com.br" || params.length!==1 ||
           params[0][0]!=="hideCard" || params[0][1]!=="true") return;
