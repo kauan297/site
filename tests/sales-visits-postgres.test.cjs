@@ -1,0 +1,20 @@
+"use strict";
+const assert = require("node:assert/strict");
+const { Pool } = require("pg");
+const { createStore } = require("../sales-visits");
+assert.equal(process.env.PALCOLIVE_DISPOSABLE_DATABASE, "1");
+assert.match(process.env.TEST_DATABASE_URL || "", /\/palcolive_disposable_test(?:\?|$)/);
+const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 8 });
+(async () => {
+  const store = createStore(pool);
+  const before = await store.summary();
+  await Promise.all(Array.from({ length: 25 }, () => store.record()));
+  const after = await store.summary();
+  assert.equal(BigInt(after.total), BigInt(before.total) + 25n);
+  assert.equal(BigInt(after.today), BigInt(before.today) + 25n);
+  assert.equal(after.timezone, "America/Sao_Paulo");
+  assert.ok(after.started_at);
+  const restarted = createStore(pool);
+  assert.equal((await restarted.summary()).total, after.total, "Records survive store restarts");
+  console.log("PASS: atomic concurrent aggregate visits and durable totals in disposable PostgreSQL.");
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => pool.end());

@@ -1,5 +1,33 @@
 "use strict";
 const $=id=>document.getElementById(id);
+$("loadVisits").addEventListener("click", async () => {
+  $("visitsStatus").textContent = "Consultando acessos...";
+  $("visitsResult").hidden = true;
+  $("loadVisits").disabled = true;
+  try {
+    const response = await fetch("/api/admin/visits", {
+      headers: { "X-PalcoLive-Admin": $("admin").value }, cache: "no-store"
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível consultar.");
+    $("visitsToday").textContent = data.today;
+    $("visitsTotal").textContent = data.total;
+    $("visitsStarted").textContent = data.started_at
+      ? "Primeiro acesso registrado: " + new Date(data.started_at).toLocaleString("pt-BR", { timeZone: data.timezone })
+      : "Nenhum acesso registrado ainda.";
+    $("visitsDaily").replaceChildren();
+    for (const day of data.daily) {
+      const row = document.createElement("tr");
+      for (const value of [day.day.split("-").reverse().join("/"), day.views]) {
+        const cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell);
+      }
+      $("visitsDaily").appendChild(row);
+    }
+    $("visitsResult").hidden = false;
+    $("visitsStatus").textContent = "Atualizado. Horário de Brasília. Robôs e acessos com proteção de privacidade podem não entrar na contagem.";
+  } catch (error) { $("visitsStatus").textContent = error.message || "Contagem indisponível."; }
+  finally { $("loadVisits").disabled = false; }
+});
 $("form").addEventListener("submit",async e=>{
   e.preventDefault();
   $("error").textContent="";

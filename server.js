@@ -8,6 +8,7 @@ const createCaktoAuto = require("./cakto-auto");
 const createKiwifyDelivery = require("./kiwify-delivery");
 const auditLegacyDatabase = require("./legacy-db-audit");
 const { publicSalesState } = require("./sales-gate");
+const salesVisits = require("./sales-visits");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -492,6 +493,14 @@ const caktoAuto = createCaktoAuto({
 });
 
 app.get("/admin", (req, res) => res.redirect(302, "/app/admin.html"));
+
+const visitsDatabaseUrl = process.env.CAKTO_DATABASE_URL || process.env.KIWIFY_DATABASE_URL || process.env.DATABASE_URL;
+const visitsPool = visitsDatabaseUrl ? new (require("pg").Pool)({
+  connectionString: visitsDatabaseUrl, max: 1, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000,
+  ssl: process.env.PGSSLMODE === "require" ? { rejectUnauthorized: true } : undefined
+}) : null;
+salesVisits.registerRoutes({ app, store: salesVisits.createStore(visitsPool),
+  adminSecret: ADMIN_SECRET, secureEqualText, limited, clientIp });
 
 app.post("/api/admin/license", (req, res) => {
   if (LICENSE_MODE !== "manual" && LICENSE_MODE !== "hybrid") {

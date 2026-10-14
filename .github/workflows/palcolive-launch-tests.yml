@@ -21,6 +21,9 @@ jobs:
       - name: Check syntax
         run: |
           node --check server.js
+          node --check sales-visits.js
+          node --check public/visits.js
+          node --check public/admin.js
           node --check sales-gate.js
           node --check kiwify-auto.js
           node --check cakto-auto.js
@@ -32,6 +35,7 @@ jobs:
         run: |
           node tests/sales-gate.test.cjs
           node tests/sales-frontend.test.cjs
+          node tests/sales-visits.test.cjs
           node tests/kiwify-short-token.test.cjs
           node tests/kiwify-storage-preflight.test.cjs
           node tests/legacy-db-audit.test.cjs
@@ -84,3 +88,8 @@ jobs:
           PALCOLIVE_DISPOSABLE_DATABASE: '1'
           TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
         run: node tests/cakto-postgres.test.cjs
+      - name: Test durable aggregate visit counters
+        env:
+          PALCOLIVE_DISPOSABLE_DATABASE: '1'
+          TEST_DATABASE_URL: postgresql://palcolive_test:disposable-test-only@localhost:5432/palcolive_disposable_test
+        run: node tests/sales-visits-postgres.test.cjs

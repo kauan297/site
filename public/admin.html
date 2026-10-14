@@ -25,11 +25,22 @@ a{color:#91cfff}
 <body>
 <main>
 <h1>PalcoLive — Vendedor</h1>
-<p>Este painel é reservado ao dono. Emita uma licença individual depois de receber o pagamento e o código do aparelho do cliente.</p>
+<p>Este painel é reservado ao dono. Consulte os acessos à página de vendas e, quando necessário, emita licenças manuais.</p>
 <div class="card">
 <form id="form">
 <label for="admin">Senha de administrador</label>
 <input id="admin" type="password" autocomplete="off" required placeholder="Senha ADMIN_SECRET do Render">
+<section aria-labelledby="visitsTitle">
+<h2 id="visitsTitle">Acessos à página de vendas</h2>
+<p>A contagem começa após a instalação. São visualizações, não pessoas únicas; retornos podem contar novamente.</p>
+<button type="button" id="loadVisits">CONSULTAR ACESSOS</button>
+<p id="visitsStatus" role="status"></p>
+<div id="visitsResult" hidden>
+<p>Hoje: <strong id="visitsToday"></strong> · Total registrado: <strong id="visitsTotal"></strong></p>
+<p id="visitsStarted"></p>
+<table style="width:100%;text-align:left"><thead><tr><th>Dia</th><th>Acessos</th></tr></thead><tbody id="visitsDaily"></tbody></table>
+</div>
+</section>
 <label for="machine">Código do aparelho do cliente</label>
 <input id="machine" type="text" autocomplete="off" autocapitalize="characters" maxlength="20" pattern="[A-Fa-f0-9]{20}" required placeholder="20 letras/números">
 <label for="days">Duração</label>
@@ -50,6 +61,6 @@ a{color:#91cfff}
 <p><small>Segurança: a senha de administrador não é salva neste navegador. Não envie esta senha, tokens nem arquivos do dono aos compradores. Licenças manuais estão vinculadas ao aparelho e não têm revogação individual automática.</small></p>
 <p><a href="/app/">Abrir painel do cliente</a></p>
 </main>
-<script src="./admin.js" defer></script>
+<script src="./admin.js?v=2" defer></script>
 </body>
 </html>
