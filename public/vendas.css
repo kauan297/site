@@ -133,3 +133,14 @@ body{background:
 }
 @media(max-width:390px){.label-two{bottom:222px}.hero h1{font-size:41px}.window-topbar{font-size:9px}.demo-action{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.arena-stars{animation:none}.avatar,.arena-effect,.step-card,.feature-card,.demo-action{transition:none}}
+
+/* Recording supplied by the creator. Native controls keep playback optional. */
+.real-demo-section{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);align-items:center;gap:52px;scroll-margin-top:105px}
+.real-demo-copy h2{font-size:clamp(36px,4.2vw,58px);line-height:1.08;margin:20px 0 24px;letter-spacing:-.055em}
+.real-demo-copy p{max-width:460px;font-size:17px;line-height:1.75}
+.real-demo-copy .real-demo-hint{font-size:13px;color:#c4b8e8;margin-bottom:26px}
+.real-demo-frame{margin:0;justify-self:center;width:100%;max-width:350px;padding:12px;background:linear-gradient(150deg,#262046,#10192e);border:1px solid #66548d;border-radius:22px;box-shadow:0 20px 65px #05081570}
+.real-demo-frame video{display:block;width:100%;height:auto;aspect-ratio:9/16;object-fit:contain;border-radius:12px;background:#05070d}
+.real-demo-frame video:focus-visible{outline:3px solid #b8b0ff;outline-offset:4px}
+.real-demo-frame figcaption{font-size:11px;text-align:center;color:#b6c0d4;padding:12px 4px 2px;line-height:1.6}
+@media(max-width:720px){.real-demo-section{grid-template-columns:1fr;gap:25px;padding:48px 0}.real-demo-copy h2{font-size:38px}.real-demo-copy p{font-size:15px}.real-demo-frame{max-width:330px}.real-demo-copy .btn{width:100%}}
