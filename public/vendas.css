@@ -144,3 +144,12 @@ body{background:
 .real-demo-frame video:focus-visible{outline:3px solid #b8b0ff;outline-offset:4px}
 .real-demo-frame figcaption{font-size:11px;text-align:center;color:#b6c0d4;padding:12px 4px 2px;line-height:1.6}
 @media(max-width:720px){.real-demo-section{grid-template-columns:1fr;gap:25px;padding:48px 0}.real-demo-copy h2{font-size:38px}.real-demo-copy p{font-size:15px}.real-demo-frame{max-width:330px}.real-demo-copy .btn{width:100%}}
+
+.hero{grid-template-areas:"copy recording" "details recording";row-gap:0}
+.hero-copy{grid-area:copy;align-self:end}
+.hero-details{grid-area:details;align-self:start}
+.hero-recording{grid-area:recording;align-self:center;scroll-margin-top:105px}
+.real-demo-badge{display:block;text-align:center;color:#d8c6ff;font-size:10px;font-weight:850;letter-spacing:.1em;padding:0 2px 10px}
+.simulation-section{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+@media(max-width:1060px){.hero{grid-template-areas:"copy" "recording" "details";row-gap:20px}.hero-copy,.hero-details{align-self:auto}.hero-recording{margin:0 auto}.simulation-section{grid-template-columns:1fr}.simulation-section .hero-preview{max-width:670px}}
+@media(max-width:720px){.hero-recording{max-width:280px}.hero-details .hero-cta-row{margin-top:22px}}
