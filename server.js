@@ -966,7 +966,7 @@ app.post("/api/tiktok/status", (req, res) => {
 app.use('/api/battle', require('./battle-relay').createBattleRelay({
   apiKey: EULER_API_KEY,
   accessHash: require('./battle-access.json').accessHash,
-  origin: 'https://batalha-da-live-kauan.calmsnipe16.chatgpt.site'
+  origin: 'https://batalha-da-live.calmsnipe16.chatgpt.site'
 }).router);
 
 app.use((req, res) => {
