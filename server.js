@@ -962,6 +962,13 @@ app.post("/api/tiktok/status", (req, res) => {
   return res.json(tiktokDirect.status(session.sid));
 });
 
+// Isolated browser-game bridge: scoped access, no Roblox/license/payment changes.
+app.use('/api/battle', require('./battle-relay').createBattleRelay({
+  apiKey: EULER_API_KEY,
+  accessHash: require('./battle-access.json').accessHash,
+  origin: 'https://batalha-da-live-kauan.calmsnipe16.chatgpt.site'
+}).router);
+
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: "Rota não encontrada." });
 });
@@ -1007,4 +1014,5 @@ app.listen(PORT, "0.0.0.0", () => {
   kiwifyDelivery.start();
   auditLegacyDatabase().catch(() => {});
 });
+
 
